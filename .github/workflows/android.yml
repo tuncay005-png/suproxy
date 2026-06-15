@@ -1,0 +1,70 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.1.12297006"
+
+      - name: Checkout hev-socks5-tunnel
+        run: |
+          git clone --recursive --depth 1 --branch 2.15.0 \
+            https://github.com/heiher/hev-socks5-tunnel.git \
+            artifacts/suproxy/modules/suproxy-vpn/android/src/main/jni/hev-socks5-tunnel
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Expo prebuild (Android)
+        working-directory: artifacts/suproxy
+        run: pnpm exec expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: artifacts/suproxy/android
+        run: ./gradlew assembleRelease --no-daemon -x lint
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: suproxy-release-apk
+          path: artifacts/suproxy/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

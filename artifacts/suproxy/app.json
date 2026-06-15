@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "SuProxy",
+    "slug": "suproxy",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "suproxy",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.app.suproxy"
+    },
+    "android": {
+      "package": "com.app.suproxy",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-splash-screen",
+      "expo-font",
+      "expo-web-browser",
+      "expo-notifications",
+      "./plugins/withSuProxyVpn.js"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8b235b4e-1e02-487b-a4db-aa7c4e6904fa"
+      }
+    },
+    "owner": "tunv518468"
+  }
+}
