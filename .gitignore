@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Native tunnel dependency (cloned by scripts/setup-native-deps.mjs)
+artifacts/suproxy/modules/suproxy-vpn/android/src/main/jni/hev-socks5-tunnel/

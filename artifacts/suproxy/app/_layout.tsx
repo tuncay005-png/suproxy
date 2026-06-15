@@ -37,10 +37,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     SplashScreen.preventAutoHideAsync().catch(() => {});
-    const timeout = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    }, 4000);
-    return () => clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
@@ -49,13 +45,11 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
-
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView>
+          <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <RootLayoutNav />
             </KeyboardProvider>

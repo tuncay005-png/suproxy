@@ -64,18 +64,13 @@ class SuProxyVpnEngine(
     builder.setMtu(1500)
     builder.addAddress("10.8.0.2", 32)
     builder.addRoute("0.0.0.0", 0)
+    builder.addRoute("::", 0)
     builder.addDnsServer("1.1.1.1")
     builder.addDnsServer("8.8.8.8")
     builder.setBlocking(true)
 
     vpnInterface = builder.establish()
       ?: return "Failed to establish VPN interface"
-
-    val fd = vpnInterface!!.fd
-    if (!service.protect(fd)) {
-      stop()
-      return "Failed to protect VPN socket"
-    }
 
     return null
   }

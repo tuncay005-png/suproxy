@@ -71,7 +71,9 @@ class SuProxyVpnService : VpnService() {
             val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             manager.notify(NOTIFICATION_ID, buildNotification("Connected"))
 
+            // Blocks until TProxyStopService() is called (ACTION_STOP or onDestroy)
             engine?.runTunnel()
+
             stopTunnel()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()

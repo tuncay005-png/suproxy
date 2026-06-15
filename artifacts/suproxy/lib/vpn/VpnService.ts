@@ -5,6 +5,7 @@ import { buildXrayClientConfig } from "@/lib/vpn/buildXrayConfig";
 import {
   resolveVpnModule,
   subscribeNativeVpnEvents,
+  type NativeVpnModule,
 } from "@/lib/vpn/VpnBridge";
 import {
   VpnError,
@@ -25,7 +26,7 @@ class VpnServiceImpl {
   private listeners = new Set<Listener>();
   private activeKey: string | null = null;
   private unsubscribeNative: (() => void) | null = null;
-  private module = resolveVpnModule();
+  private module: NativeVpnModule | null = null;
 
   constructor() {
     this.unsubscribeNative = subscribeNativeVpnEvents((status) => {
@@ -58,6 +59,13 @@ class VpnServiceImpl {
     if (!vlessUrl && this.state.status !== "disconnected") {
       void this.disconnect();
     }
+  }
+
+  private getModule(): NativeVpnModule {
+    if (!this.module) {
+      this.module = resolveVpnModule();
+    }
+    return this.module;
   }
 
   async toggle(): Promise<void> {
@@ -97,14 +105,14 @@ class VpnServiceImpl {
         socksPort: 10808,
       });
 
-      if (this.module.prepare) {
-        const ready = await this.module.prepare();
+      if (this.getModule().prepare) {
+        const ready = await this.getModule().prepare();
         if (!ready) {
           throw new VpnError("VPN permission was denied", "PERMISSION_DENIED");
         }
       }
 
-      await this.module.start(configJson);
+      await this.getModule().start(configJson);
       await this.waitForStatus(["connected", "error"], 45_000);
       if (this.state.status === "error") {
         throw new VpnError(this.state.error ?? "VPN connection failed", "CONNECT_FAILED");
@@ -128,7 +136,7 @@ class VpnServiceImpl {
 
     try {
       this.setStatus("disconnecting", null);
-      await this.module.stop();
+      await this.getModule().stop();
       this.setStatus("disconnected", null);
     } catch (error) {
       const message =

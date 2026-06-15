@@ -45,21 +45,27 @@ jobs:
             "build-tools;35.0.0" \
             "ndk;27.1.12297006"
 
-      - name: Checkout hev-socks5-tunnel
-        run: |
-          git clone --recursive --depth 1 --branch 2.15.0 \
-            https://github.com/heiher/hev-socks5-tunnel.git \
-            artifacts/suproxy/modules/suproxy-vpn/android/src/main/jni/hev-socks5-tunnel
+      - name: Setup native dependencies
+        run: node scripts/setup-native-deps.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Expo prebuild (Android)
         working-directory: artifacts/suproxy
-        run: pnpm exec expo prebuild --platform android --no-install
+        run: pnpm exec expo prebuild --platform android --no-install --clean
+
+      - name: Configure release build
+        working-directory: artifacts/suproxy/android
+        run: |
+          echo "" >> gradle.properties
+          echo "reactNativeArchitectures=arm64-v8a,armeabi-v7a" >> gradle.properties
+          chmod +x gradlew
 
       - name: Build release APK
         working-directory: artifacts/suproxy/android
+        env:
+          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g
         run: ./gradlew assembleRelease --no-daemon -x lint
 
       - name: Upload APK artifact
