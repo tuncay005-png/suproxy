@@ -1,0 +1,63 @@
+plugins {
+  id 'com.android.library'
+  id 'kotlin-android'
+}
+
+group = 'com.app.suproxy.vpn'
+version = '1.0.0'
+
+android {
+  namespace "com.app.suproxy.vpn"
+  compileSdkVersion safeExtGet("compileSdkVersion", 35)
+  ndkVersion safeExtGet("ndkVersion", "27.1.12297006")
+
+  defaultConfig {
+    minSdkVersion safeExtGet("minSdkVersion", 24)
+    targetSdkVersion safeExtGet("targetSdkVersion", 35)
+    ndk {
+      abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+    }
+    externalNativeBuild {
+      ndkBuild {
+        arguments "APP_CFLAGS+=-DPKGNAME=hev/socks5 -ffile-prefix-map=${rootDir}=."
+        arguments "APP_LDFLAGS+=-Wl,--build-id=none"
+      }
+    }
+  }
+
+  externalNativeBuild {
+    ndkBuild {
+      path "src/main/jni/Android.mk"
+    }
+  }
+
+  lintOptions {
+    abortOnError false
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+
+  kotlinOptions {
+    jvmTarget = "17"
+  }
+}
+
+repositories {
+  mavenCentral()
+  maven { url "https://jitpack.io" }
+}
+
+dependencies {
+  implementation project(':expo-modules-core')
+  implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${safeExtGet('kotlinVersion', '2.0.21')}"
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
+  implementation "androidx.core:core-ktx:1.15.0"
+  implementation "com.github.2dust:AndroidLibXrayLite:v26.1.31"
+}
+
+def safeExtGet(prop, fallback) {
+  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
