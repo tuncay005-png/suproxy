@@ -2,7 +2,6 @@ const {
   withAndroidManifest,
   withInfoPlist,
   withEntitlementsPlist,
-  AndroidConfig,
 } = require("@expo/config-plugins");
 
 const VPN_SERVICE = "com.app.suproxy.vpn.SuProxyVpnService";
@@ -28,7 +27,11 @@ function withSuProxyVpnAndroid(config) {
 
     manifest["uses-permission"] = permissions;
 
-    const app = AndroidConfig.Manifest.getMainApplicationOrThrow(manifest);
+    if (!manifest.application) {
+      manifest.application = [{ $: {} }];
+    }
+
+    const app = manifest.application[0];
     app.service = app.service ?? [];
 
     const hasService = app.service.some(
