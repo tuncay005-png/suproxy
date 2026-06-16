@@ -37,7 +37,7 @@ object XrayRunner {
   fun start(configJson: String): String? {
     return try {
       val controller = coreController ?: return "Xray core not initialized"
-      if (controller.isRunning) {
+      if (controller.getIsRunning()) {
         return null
       }
       // tunFd=0: SOCKS inbound + hev-socks5-tunnel handles TUN routing.

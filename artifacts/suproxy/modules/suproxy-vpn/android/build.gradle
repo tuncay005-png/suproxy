@@ -45,9 +45,12 @@ android {
   }
 }
 
+def XRAY_MAVEN_VERSION = "26.6.14"
+
 repositories {
   mavenCentral()
   google()
+  maven { url uri("$projectDir/maven") }
 }
 
 dependencies {
@@ -55,7 +58,7 @@ dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${safeExtGet('kotlinVersion', '2.0.21')}"
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
   implementation "androidx.core:core-ktx:1.15.0"
-  implementation files("libs/libv2ray.aar")
+  implementation "com.github.2dust:libv2ray:${XRAY_MAVEN_VERSION}"
 }
 
 def safeExtGet(prop, fallback) {

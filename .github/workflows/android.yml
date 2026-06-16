@@ -66,7 +66,16 @@ jobs:
         working-directory: artifacts/suproxy/android
         env:
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g
-        run: ./gradlew assembleRelease --no-daemon -x lint
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon -x lint --stacktrace 2>&1 | tee ../gradle-build.log
+
+      - name: Upload Gradle log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: artifacts/suproxy/gradle-build.log
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

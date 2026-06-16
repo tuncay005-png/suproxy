@@ -52,7 +52,8 @@ Thumbs.db
 artifacts/suproxy/modules/suproxy-vpn/android/src/main/jni/hev-socks5-tunnel/
 
 # libXray AAR (downloaded by scripts/setup-native-deps.mjs)
-artifacts/suproxy/modules/suproxy-vpn/android/libs/*.aar
+artifacts/suproxy/modules/suproxy-vpn/android/libs/
+artifacts/suproxy/modules/suproxy-vpn/android/maven/
 
 # Erroneous root-level Android prebuild output (use artifacts/suproxy/android)
 /android/
