@@ -3,12 +3,12 @@ package com.app.suproxy.vpn
 import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import kotlinx.coroutines.CompletableDeferred
 
 class SuProxyVpnModule : Module() {
-  private var prepareDeferred: CompletableDeferred<Boolean>? = null
+  private var preparePromise: Promise? = null
 
   override fun definition() = ModuleDefinition {
     Name("SuProxyVpn")
@@ -19,21 +19,21 @@ class SuProxyVpnModule : Module() {
       VpnStatusEmitter.bind(this@SuProxyVpnModule)
     }
 
-    AsyncFunction("prepare") {
+    AsyncFunction("prepare") { promise: Promise ->
       val activity = appContext.currentActivity
       if (activity == null) {
-        false
-      } else {
-        val intent = VpnService.prepare(activity)
-        if (intent == null) {
-          true
-        } else {
-          val deferred = CompletableDeferred<Boolean>()
-          prepareDeferred = deferred
-          activity.startActivityForResult(intent, VPN_PREPARE_REQUEST)
-          deferred.await()
-        }
+        promise.resolve(false)
+        return@AsyncFunction
       }
+
+      val intent = VpnService.prepare(activity)
+      if (intent == null) {
+        promise.resolve(true)
+        return@AsyncFunction
+      }
+
+      preparePromise = promise
+      activity.startActivityForResult(intent, VPN_PREPARE_REQUEST)
     }
 
     AsyncFunction("getStatus") {
@@ -61,8 +61,8 @@ class SuProxyVpnModule : Module() {
 
     OnActivityResult { _, result ->
       if (result.requestCode == VPN_PREPARE_REQUEST) {
-        prepareDeferred?.complete(result.resultCode == Activity.RESULT_OK)
-        prepareDeferred = null
+        preparePromise?.resolve(result.resultCode == Activity.RESULT_OK)
+        preparePromise = null
       }
     }
   }
