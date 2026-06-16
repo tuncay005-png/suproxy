@@ -1,34 +1,48 @@
 package com.app.suproxy.vpn
 
 import android.content.Context
-import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import hev.socks5.TProxyService
-import libXray.LibXray
+import libv2ray.CoreCallbackHandler
+import libv2ray.CoreController
+import libv2ray.Libv2ray
 import java.io.File
 
 object XrayRunner {
   private const val TAG = "SuProxyVpn"
   private const val SOCKS_PORT = 10808
   private var initialized = false
+  private var coreController: CoreController? = null
 
-  fun init(context: Context, protect: (Int) -> Boolean) {
+  private val callback = object : CoreCallbackHandler {
+    override fun startup(): Int = 0
+
+    override fun shutdown(): Int = 0
+
+    override fun onEmitStatus(code: Int, msg: String?): Int {
+      Log.i(TAG, "Xray status [$code]: $msg")
+      return 0
+    }
+  }
+
+  fun init(context: Context, @Suppress("UNUSED_PARAMETER") protect: (Int) -> Boolean) {
     if (initialized) return
     val assetDir = File(context.filesDir, "xray").apply { mkdirs() }
-    LibXray.initCoreEnv(assetDir.absolutePath, "")
-    try {
-      LibXray.registerDialerController { fd -> protect(fd.toInt()) }
-    } catch (_: Exception) {
-      // older libXray builds may omit dialer controller
-    }
+    Libv2ray.initCoreEnv(assetDir.absolutePath, "")
+    coreController = Libv2ray.newCoreController(callback)
     initialized = true
   }
 
   fun start(configJson: String): String? {
     return try {
-      val result = LibXray.runXrayFromJson(configJson)
-      if (result.isNullOrEmpty()) null else result
+      val controller = coreController ?: return "Xray core not initialized"
+      if (controller.isRunning) {
+        return null
+      }
+      // tunFd=0: SOCKS inbound + hev-socks5-tunnel handles TUN routing.
+      controller.startLoop(configJson, 0)
+      null
     } catch (e: Exception) {
       Log.e(TAG, "Xray start failed", e)
       e.message
@@ -37,7 +51,7 @@ object XrayRunner {
 
   fun stop() {
     try {
-      LibXray.stopXray()
+      coreController?.stopLoop()
     } catch (e: Exception) {
       Log.e(TAG, "Xray stop failed", e)
     }
