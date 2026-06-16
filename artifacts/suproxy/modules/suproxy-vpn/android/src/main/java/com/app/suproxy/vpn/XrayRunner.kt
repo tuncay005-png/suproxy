@@ -16,13 +16,13 @@ object XrayRunner {
   private var coreController: CoreController? = null
 
   private val callback = object : CoreCallbackHandler {
-    override fun startup(): Int = 0
+    override fun startup(): Long = 0L
 
-    override fun shutdown(): Int = 0
+    override fun shutdown(): Long = 0L
 
-    override fun onEmitStatus(code: Int, msg: String?): Int {
+    override fun onEmitStatus(code: Long, msg: String?): Long {
       Log.i(TAG, "Xray status [$code]: $msg")
-      return 0
+      return 0L
     }
   }
 

@@ -20,17 +20,20 @@ class SuProxyVpnModule : Module() {
     }
 
     AsyncFunction("prepare") {
-      val activity = appContext.currentActivity ?: return@AsyncFunction false
-
-      val intent = VpnService.prepare(activity)
-      if (intent == null) {
-        return@AsyncFunction true
+      val activity = appContext.currentActivity
+      if (activity == null) {
+        false
+      } else {
+        val intent = VpnService.prepare(activity)
+        if (intent == null) {
+          true
+        } else {
+          val deferred = CompletableDeferred<Boolean>()
+          prepareDeferred = deferred
+          activity.startActivityForResult(intent, VPN_PREPARE_REQUEST)
+          deferred.await()
+        }
       }
-
-      val deferred = CompletableDeferred<Boolean>()
-      prepareDeferred = deferred
-      activity.startActivityForResult(intent, VPN_PREPARE_REQUEST)
-      deferred.await()
     }
 
     AsyncFunction("getStatus") {
@@ -47,11 +50,13 @@ class SuProxyVpnModule : Module() {
     }
 
     AsyncFunction("stop") {
-      val context = appContext.reactContext ?: return@AsyncFunction
-      val intent = Intent(context, SuProxyVpnService::class.java).apply {
-        action = SuProxyVpnService.ACTION_STOP
+      val context = appContext.reactContext
+      if (context != null) {
+        val intent = Intent(context, SuProxyVpnService::class.java).apply {
+          action = SuProxyVpnService.ACTION_STOP
+        }
+        context.startService(intent)
       }
-      context.startService(intent)
     }
 
     OnActivityResult { _, result ->
