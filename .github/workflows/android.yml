@@ -55,12 +55,12 @@ jobs:
         working-directory: artifacts/suproxy
         run: pnpm exec expo prebuild --platform android --no-install --clean
 
+      - name: Patch Android Gradle
+        run: node scripts/patch-android-gradle.mjs
+
       - name: Configure release build
         working-directory: artifacts/suproxy/android
-        run: |
-          echo "" >> gradle.properties
-          echo "reactNativeArchitectures=arm64-v8a,armeabi-v7a" >> gradle.properties
-          chmod +x gradlew
+        run: chmod +x gradlew
 
       - name: Build release APK
         working-directory: artifacts/suproxy/android

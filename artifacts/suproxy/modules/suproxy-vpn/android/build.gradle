@@ -47,7 +47,7 @@ android {
 
 repositories {
   mavenCentral()
-  maven { url "https://jitpack.io" }
+  google()
 }
 
 dependencies {
@@ -55,7 +55,7 @@ dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${safeExtGet('kotlinVersion', '2.0.21')}"
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
   implementation "androidx.core:core-ktx:1.15.0"
-  implementation "com.github.2dust:AndroidLibXrayLite:v26.1.31"
+  implementation files("libs/libv2ray.aar")
 }
 
 def safeExtGet(prop, fallback) {

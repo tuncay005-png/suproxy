@@ -13,6 +13,7 @@
     "ios": "pnpm exec expo run:ios"
   },
   "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.0",
     "expo-clipboard": "~8.0.8",
     "expo-modules-core": "~3.0.15",
     "expo-notifications": "^0.32.17",
@@ -24,7 +25,6 @@
   "devDependencies": {
     "@expo/config-plugins": "~10.1.1",
     "@babel/core": "^7.25.2",
-    "@expo-google-fonts/inter": "^0.4.0",
     "@expo/cli": "54.0.23",
     "@expo/ngrok": "^4.1.0",
     "@expo/vector-icons": "^15.0.3",

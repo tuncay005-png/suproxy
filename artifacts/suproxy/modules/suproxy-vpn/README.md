@@ -5,7 +5,7 @@ Expo local module that bridges JavaScript to platform VPN APIs.
 ## Android
 
 - `SuProxyVpnService` — Foreground `VpnService` with persistent notification
-- `AndroidLibXrayLite` (JitPack) — Xray-core for VLESS / Reality / XTLS-Vision
+- `AndroidLibXrayLite` (official GitHub release AAR) — Xray-core for VLESS / Reality / XTLS-Vision
 - SOCKS inbound on port `10808` + optional `hev-socks5-tunnel` for TUN routing
 
 ### Build
