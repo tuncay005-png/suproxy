@@ -48,6 +48,12 @@ jobs:
       - name: Setup native dependencies
         run: node scripts/setup-native-deps.mjs
 
+      - name: Verify native artifacts
+        run: |
+          test -f artifacts/suproxy/modules/suproxy-vpn/android/libs/libv2ray.aar
+          test -f artifacts/suproxy/modules/suproxy-vpn/android/maven/com/github/2dust/libv2ray/26.6.14/libv2ray-26.6.14.aar
+          test -f artifacts/suproxy/modules/suproxy-vpn/android/src/main/jni/hev-socks5-tunnel/Android.mk
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -76,6 +82,18 @@ jobs:
         with:
           name: gradle-build-log
           path: artifacts/suproxy/gradle-build.log
+
+      - name: Report Gradle failures
+        if: failure()
+        working-directory: artifacts/suproxy
+        run: |
+          if [ -f gradle-build.log ]; then
+            echo "## Gradle failure excerpt" >> "$GITHUB_STEP_SUMMARY"
+            grep -E "FAILED|error:|Error:|Exception|Could not|e: file:" gradle-build.log | tail -n 50 >> "$GITHUB_STEP_SUMMARY" || true
+            grep -E "FAILED|error:|Error:|Exception|Could not|e: file:" gradle-build.log | tail -n 15 | while IFS= read -r line; do
+              echo "::error title=Gradle::${line}"
+            done || true
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

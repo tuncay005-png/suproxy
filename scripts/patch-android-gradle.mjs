@@ -4,42 +4,29 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const androidDir = join(root, "artifacts/suproxy/android");
+const localMavenSnippet =
+  "    maven { url uri(\"${rootDir}/../modules/suproxy-vpn/android/maven\") }";
 
 if (!existsSync(androidDir)) {
   console.error(`Android project not found at ${androidDir}. Run expo prebuild first.`);
   process.exit(1);
 }
 
-function ensureRepo(content, marker, snippet) {
-  if (content.includes(marker)) {
-    return content;
-  }
-  return content.replace(/repositories\s*\{/, `repositories {\n${snippet}`);
-}
-
-function patchSettingsGradle() {
-  const path = join(androidDir, "settings.gradle");
-  let content = readFileSync(path, "utf8");
-
-  content = ensureRepo(
-    content,
-    "jitpack.io",
-    '      maven { url = uri("https://jitpack.io") }',
-  );
-
-  writeFileSync(path, content);
-  console.log("Patched settings.gradle");
-}
-
 function patchRootBuildGradle() {
   const path = join(androidDir, "build.gradle");
   let content = readFileSync(path, "utf8");
 
+  if (!content.includes("suproxy-vpn/android/maven")) {
+    content = content.replace(
+      /allprojects\s*\{\s*\n\s*repositories\s*\{/,
+      `allprojects {\n  repositories {\n${localMavenSnippet}`,
+    );
+  }
+
   if (!content.includes("jitpack.io")) {
-    content = ensureRepo(
-      content,
-      "jitpack.io",
-      "    maven { url 'https://jitpack.io' }",
+    content = content.replace(
+      /allprojects\s*\{\s*\n\s*repositories\s*\{/,
+      `allprojects {\n  repositories {\n    maven { url 'https://jitpack.io' }`,
     );
   }
 
@@ -69,6 +56,5 @@ function patchGradleProperties() {
   console.log("Patched gradle.properties");
 }
 
-patchSettingsGradle();
 patchRootBuildGradle();
 patchGradleProperties();
