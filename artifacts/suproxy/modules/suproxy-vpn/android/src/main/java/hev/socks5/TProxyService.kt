@@ -14,7 +14,7 @@ object TProxyService {
   private external fun TProxyStartService(configPath: String, fd: Int)
 
   @JvmStatic
-  private external fun TProxyStopServiceNonBlocking()
+  private external fun TProxyStopService()  // Keep for JNI compatibility
 
   @JvmStatic
   private external fun TProxyGetStats(): LongArray
@@ -46,9 +46,10 @@ object TProxyService {
 
   @JvmStatic
   fun stop() {
-    // Non-blocking stop: signal to quit, don't wait
+    // Non-blocking: send quit signal without waiting
+    // Called on background thread to avoid main thread blocking
     try {
-      TProxyStopServiceNonBlocking()
+      TProxyStopService()  // This calls the non-blocking version in hev-jni.c
     } catch (e: Exception) {
       Log.e("TProxyService", "Stop signal failed", e)
     }
