@@ -64,8 +64,15 @@ class SuProxyVpnModule : Module() {
         action = SuProxyVpnService.ACTION_START
         putExtra(SuProxyVpnService.EXTRA_CONFIG, configJson)
       }
-      // Use application context to avoid ContextWrapper ComponentName issues
-      applicationContext.startForegroundService(intent)
+      // startForegroundService returns ComponentName which Expo cannot serialize
+      // We ignore the return value to avoid serialization errors
+      try {
+        applicationContext.startForegroundService(intent)
+        Log.i(TAG, "start() - VPN service started")
+      } catch (e: Exception) {
+        Log.e(TAG, "start() failed", e)
+        throw e
+      }
     }
 
     AsyncFunction("stop") {
@@ -75,7 +82,15 @@ class SuProxyVpnModule : Module() {
         val intent = Intent(applicationContext, SuProxyVpnService::class.java).apply {
           action = SuProxyVpnService.ACTION_STOP
         }
-        applicationContext.startService(intent)
+        try {
+          // startService returns ComponentName which Expo cannot serialize
+          // We ignore the return value to avoid serialization errors
+          applicationContext.startService(intent)
+          Log.i(TAG, "stop() - VPN service stop requested")
+        } catch (e: Exception) {
+          Log.e(TAG, "stop() failed", e)
+          throw e
+        }
       }
     }
 
