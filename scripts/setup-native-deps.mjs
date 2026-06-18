@@ -32,6 +32,24 @@ if (!existsSync(join(hevDir, "Android.mk"))) {
   console.log("hev-socks5-tunnel already present.");
 }
 
+// Patch hev-jni.c: fix default PKGNAME from hev/htproxy to hev/socks5
+// so JNI_OnLoad registers native methods on the correct Java class.
+const hevJniPath = join(hevDir, "src", "hev-jni.c");
+if (existsSync(hevJniPath)) {
+  const { readFileSync, writeFileSync: wfs } = await import("node:fs");
+  let jniSrc = readFileSync(hevJniPath, "utf8");
+  if (jniSrc.includes("#define PKGNAME hev/htproxy")) {
+    jniSrc = jniSrc.replace(
+      "#define PKGNAME hev/htproxy",
+      "#define PKGNAME hev/socks5",
+    );
+    wfs(hevJniPath, jniSrc, "utf8");
+    console.log("Patched hev-jni.c: PKGNAME hev/htproxy -> hev/socks5");
+  } else {
+    console.log("hev-jni.c already has correct PKGNAME (no patch needed).");
+  }
+}
+
 if (!existsSync(xrayAarPath)) {
   mkdirSync(xrayLibsDir, { recursive: true });
   console.log(`Downloading libXray ${XRAY_TAG} from AndroidLibXrayLite releases...`);
