@@ -19,9 +19,6 @@ object TProxyService {
   @JvmStatic
   private external fun TProxyGetStats(): LongArray
 
-  @JvmStatic
-  private external fun TProxyIsRunning(): Boolean
-
   private var tunnelStarted = AtomicBoolean(false)
 
   @JvmStatic
@@ -58,12 +55,12 @@ object TProxyService {
 
   @JvmStatic
   fun waitRunning() {
-    // Block until tunnel service finishes
+    // Block until tunnel service finishes (via polling tunnelStarted flag)
     // This should be called on a background thread
     val maxWaitMs = 60_000L  // 60 second timeout
     val startTime = System.currentTimeMillis()
     
-    while (tunnelStarted.get() && TProxyIsRunning()) {
+    while (tunnelStarted.get()) {
       if (System.currentTimeMillis() - startTime > maxWaitMs) {
         Log.w("TProxyService", "Tunnel wait timeout")
         break
