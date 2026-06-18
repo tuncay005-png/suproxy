@@ -9,8 +9,9 @@ import libv2ray.CoreController
 import libv2ray.Libv2ray
 import java.io.File
 
+private const val TAG = "SuProxyVpn"
+
 object XrayRunner {
-  private const val TAG = "SuProxyVpn"
   private const val SOCKS_PORT = 10808
   private var initialized = false
   private var coreController: CoreController? = null
