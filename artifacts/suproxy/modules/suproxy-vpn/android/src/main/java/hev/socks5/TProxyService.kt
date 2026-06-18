@@ -3,7 +3,8 @@ package hev.socks5
 import android.content.Context
 import android.util.Log
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 object TProxyService {
   init {
@@ -14,12 +15,14 @@ object TProxyService {
   private external fun TProxyStartService(configPath: String, fd: Int)
 
   @JvmStatic
-  private external fun TProxyStopService()  // Keep for JNI compatibility
+  private external fun TProxyStopService()
 
   @JvmStatic
   private external fun TProxyGetStats(): LongArray
 
-  private var tunnelStarted = AtomicBoolean(false)
+  // Latch: counts down to 0 when stop() is called, unblocking waitRunning()
+  @Volatile
+  private var stopLatch: CountDownLatch? = null
 
   @JvmStatic
   fun start(context: Context, tunFd: Int, socksPort: Int, socksHost: String = "127.0.0.1") {
@@ -36,37 +39,27 @@ object TProxyService {
 
     val file = File(context.cacheDir, "suproxy-tproxy.yml")
     file.writeText(config)
-    
+
+    // Create a fresh latch before starting so waitRunning() blocks correctly
+    stopLatch = CountDownLatch(1)
     TProxyStartService(file.absolutePath, tunFd)
-    tunnelStarted.set(true)
   }
 
   @JvmStatic
   fun stop() {
-    // Non-blocking: send quit signal without waiting
-    // Called on background thread to avoid main thread blocking
     try {
-      TProxyStopService()  // This calls the non-blocking version in hev-jni.c
+      TProxyStopService()
     } catch (e: Exception) {
       Log.e("TProxyService", "Stop signal failed", e)
     }
-    tunnelStarted.set(false)
+    // Signal waitRunning() to unblock
+    stopLatch?.countDown()
   }
 
   @JvmStatic
   fun waitRunning() {
-    // Block until tunnel service finishes (via polling tunnelStarted flag)
-    // This should be called on a background thread
-    val maxWaitMs = 60_000L  // 60 second timeout
-    val startTime = System.currentTimeMillis()
-    
-    while (tunnelStarted.get()) {
-      if (System.currentTimeMillis() - startTime > maxWaitMs) {
-        Log.w("TProxyService", "Tunnel wait timeout")
-        break
-      }
-      Thread.sleep(100)  // Poll every 100ms
-    }
+    // Block until stop() is called (latch reaches 0) or 60s timeout
+    stopLatch?.await(60, TimeUnit.SECONDS)
   }
 
   @JvmStatic

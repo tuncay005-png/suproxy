@@ -15,6 +15,10 @@ object XrayRunner {
   private var initialized = false
   private var coreController: CoreController? = null
 
+  // Stored so the CoreCallbackHandler.protect() can call VpnService.protect()
+  // to bypass the TUN for Xray's outbound sockets (prevents routing loop)
+  private var protectFd: ((Int) -> Boolean)? = null
+
   private val callback = object : CoreCallbackHandler {
     override fun startup(): Long = 0L
 
@@ -24,9 +28,15 @@ object XrayRunner {
       Log.i(TAG, "Xray status [$code]: $msg")
       return 0L
     }
+
+    // libv2ray calls this to protect outbound sockets from being routed into TUN
+    override fun protect(fd: Long): Boolean {
+      return protectFd?.invoke(fd.toInt()) ?: false
+    }
   }
 
-  fun init(context: Context, @Suppress("UNUSED_PARAMETER") protect: (Int) -> Boolean) {
+  fun init(context: Context, protect: (Int) -> Boolean) {
+    protectFd = protect
     if (initialized) return
     val assetDir = File(context.filesDir, "xray").apply { mkdirs() }
     Libv2ray.initCoreEnv(assetDir.absolutePath, "")
@@ -82,6 +92,9 @@ class SuProxyVpnEngine(
     builder.addDnsServer("1.1.1.1")
     builder.addDnsServer("8.8.8.8")
     builder.setBlocking(true)
+    // Exclude this app from the TUN so Xray's outbound traffic (to the VPN
+    // server) is not re-routed back into the tunnel — prevents routing loop
+    builder.addDisallowedApplication(service.packageName)
 
     vpnInterface = builder.establish()
       ?: return "Failed to establish VPN interface"

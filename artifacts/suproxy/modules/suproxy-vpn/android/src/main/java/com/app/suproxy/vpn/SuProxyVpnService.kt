@@ -11,7 +11,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import java.util.concurrent.Executors
 
 class SuProxyVpnService : VpnService() {
   companion object {
@@ -26,8 +25,6 @@ class SuProxyVpnService : VpnService() {
 
     @Volatile
     var status: String = "disconnected"
-    
-    private val stopExecutor = Executors.newSingleThreadExecutor()
   }
 
   private var engine: SuProxyVpnEngine? = null
@@ -131,16 +128,17 @@ class SuProxyVpnService : VpnService() {
   }
 
   private fun stopTunnelAsync() {
-    // Non-blocking: run stop on background thread to avoid blocking main/JNI thread
-    stopExecutor.execute {
+    val engineRef = engine
+    engine = null
+    // Run stop on a fresh thread - NOT the single stopExecutor which could
+    // be blocked from a prior stop attempt
+    Thread {
       try {
-        engine?.stop()
+        engineRef?.stop()
       } catch (e: Exception) {
         Log.e("SuProxyVpn", "Failed to stop tunnel", e)
-      } finally {
-        engine = null
       }
-    }
+    }.also { it.isDaemon = true }.start()
   }
 
   private fun createNotificationChannel() {

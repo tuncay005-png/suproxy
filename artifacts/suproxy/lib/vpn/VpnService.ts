@@ -137,7 +137,12 @@ class VpnServiceImpl {
     try {
       this.setStatus("disconnecting", null);
       await this.getModule().stop();
-      this.setStatus("disconnected", null);
+      // Wait for the native service to emit "disconnected" (up to 10s)
+      // instead of assuming it happened immediately
+      await this.waitForStatus(["disconnected", "error"], 10_000);
+      if (this.state.status !== "disconnected") {
+        this.setStatus("disconnected", null);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "VPN disconnect failed";
