@@ -10,6 +10,11 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 class SuProxyVpnModule : Module() {
+  companion object {
+    private const val TAG = "SuProxyVpn"
+    private const val VPN_PREPARE_REQUEST = 9100
+  }
+
   private var preparePromise: Promise? = null
   private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -25,18 +30,26 @@ class SuProxyVpnModule : Module() {
     AsyncFunction("prepare") { promise: Promise ->
       val activity = appContext.currentActivity
       if (activity == null) {
-        promise.resolve(false)
+        Log.e(TAG, "prepare() failed: currentActivity is null")
+        promise.reject("ACTIVITY_NOT_AVAILABLE", "VPN activity not available", null)
         return@AsyncFunction
       }
 
-      val intent = VpnService.prepare(activity)
-      if (intent == null) {
-        promise.resolve(true)
-        return@AsyncFunction
-      }
+      try {
+        val intent = VpnService.prepare(activity)
+        if (intent == null) {
+          Log.i(TAG, "prepare() - VPN permission already granted")
+          promise.resolve(true)
+          return@AsyncFunction
+        }
 
-      preparePromise = promise
-      activity.startActivityForResult(intent, VPN_PREPARE_REQUEST)
+        Log.i(TAG, "prepare() - Showing VPN permission dialog")
+        preparePromise = promise
+        activity.startActivityForResult(intent, VPN_PREPARE_REQUEST)
+      } catch (e: Exception) {
+        Log.e(TAG, "prepare() exception", e)
+        promise.reject("PREPARE_FAILED", e.message, e)
+      }
     }
 
     AsyncFunction("getStatus") {
@@ -73,9 +86,7 @@ class SuProxyVpnModule : Module() {
     }
   }
 
-  companion object {
-    private const val VPN_PREPARE_REQUEST = 9100
-  }
+
 }
 
 object VpnStatusEmitter {

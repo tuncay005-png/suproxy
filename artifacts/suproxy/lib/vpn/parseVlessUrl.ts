@@ -39,6 +39,40 @@ function readSecurity(value: string | null): ParsedVlessProfile["security"] {
   return "none";
 }
 
+function validateEncryption(raw: string): string {
+  // Xray-core supported encryptions (VLESS)
+  const validEncryptions = [
+    "none",
+    "aes-128-gcm",
+    "aes-256-gcm",
+    "chacha20-poly1305",
+    "auto",
+  ];
+  
+  // If encryption contains dots or is very long, it's likely a malformed key exchange param
+  if (raw.includes(".") || raw.length > 30) {
+    console.warn(
+      `Invalid encryption format: "${raw}". This looks like a key exchange parameter, not encryption method.`,
+    );
+    // Try to extract the base method (first part before dot)
+    const base = raw.split(".")[0];
+    if (validEncryptions.includes(base)) {
+      return base;
+    }
+    // Default to none if can't parse
+    return "none";
+  }
+  
+  // If it's a valid encryption, return it
+  if (validEncryptions.includes(raw)) {
+    return raw;
+  }
+  
+  // Unknown encryption, default to none
+  console.warn(`Unknown encryption: "${raw}", defaulting to "none"`);
+  return "none";
+}
+
 export function parseVlessUrl(raw: string): ParsedVlessProfile {
   const trimmed = raw.trim();
   if (!trimmed.toLowerCase().startsWith("vless://")) {
@@ -69,7 +103,12 @@ export function parseVlessUrl(raw: string): ParsedVlessProfile {
 
   const network = params.get("type") ?? "tcp";
   const security = readSecurity(params.get("security"));
-  const encryption = params.get("encryption") ?? "none";
+  const encryptionRaw = params.get("encryption") ?? "none";
+  
+  // Validate encryption format - should be simple method, not complex key exchange params
+  // Valid: aes-128-gcm, chacha20-poly1305, none
+  // Invalid: mlkem768x25519plus.native.0rtt.xxx (this is key exchange, not encryption)
+  const encryption = validateEncryption(encryptionRaw);
   const flow = params.get("flow") ?? undefined;
 
   const profile: ParsedVlessProfile = {
