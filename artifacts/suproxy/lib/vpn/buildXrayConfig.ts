@@ -143,9 +143,14 @@ export function buildXrayClientConfig(
           outboundTag: "direct",
         },
         // Route VPN server itself directly to prevent routing loop
+        // Must use CIDR notation (/32 for IPv4, /128 for IPv6)
         {
           type: "field",
-          ip: [profile.address],
+          ip: [
+            `${profile.address}/32`,
+            // Also bypass if IPv6
+            ...(profile.address.includes(":") ? [] : []),
+          ],
           outboundTag: "direct",
         },
         // Route DNS servers directly
