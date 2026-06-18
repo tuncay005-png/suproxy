@@ -3,12 +3,15 @@ package com.app.suproxy.vpn
 import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
+import android.os.Handler
+import android.os.Looper
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 class SuProxyVpnModule : Module() {
   private var preparePromise: Promise? = null
+  private val mainHandler = Handler(Looper.getMainLooper())
 
   override fun definition() = ModuleDefinition {
     Name("SuProxyVpn")
@@ -16,7 +19,7 @@ class SuProxyVpnModule : Module() {
     Events("SuProxyVpnStatusChanged")
 
     OnCreate {
-      VpnStatusEmitter.bind(this@SuProxyVpnModule)
+      VpnStatusEmitter.bind(this@SuProxyVpnModule, mainHandler)
     }
 
     AsyncFunction("prepare") { promise: Promise ->
@@ -74,12 +77,16 @@ class SuProxyVpnModule : Module() {
 
 object VpnStatusEmitter {
   private var module: SuProxyVpnModule? = null
+  private var handler: Handler? = null
 
-  fun bind(mod: SuProxyVpnModule) {
+  fun bind(mod: SuProxyVpnModule, mainHandler: Handler) {
     module = mod
+    handler = mainHandler
   }
 
   fun emit(status: String) {
-    module?.sendEvent("SuProxyVpnStatusChanged", mapOf("status" to status))
+    handler?.post {
+      module?.sendEvent("SuProxyVpnStatusChanged", mapOf("status" to status))
+    }
   }
 }

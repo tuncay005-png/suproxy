@@ -99,8 +99,19 @@ class SuProxyVpnEngine(
       )
       null
     } catch (e: Exception) {
-      Log.e("SuProxyVpn", "Tun2Socks failed", e)
+      Log.e("SuProxyVpn", "TUN routing failed", e)
       e.message ?: "TUN routing failed"
+    }
+  }
+
+  fun waitTunnel(): String? {
+    // Block until tunnel service stops (signals quit)
+    return try {
+      TProxyService.waitRunning()
+      null
+    } catch (e: Exception) {
+      Log.e("SuProxyVpn", "Tunnel wait failed", e)
+      e.message
     }
   }
 

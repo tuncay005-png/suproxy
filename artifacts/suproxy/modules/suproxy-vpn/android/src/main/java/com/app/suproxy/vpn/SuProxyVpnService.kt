@@ -7,8 +7,11 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import java.util.concurrent.Executors
 
 class SuProxyVpnService : VpnService() {
   companion object {
@@ -23,9 +26,12 @@ class SuProxyVpnService : VpnService() {
 
     @Volatile
     var status: String = "disconnected"
+    
+    private val stopExecutor = Executors.newSingleThreadExecutor()
   }
 
   private var engine: SuProxyVpnEngine? = null
+  private val mainHandler = Handler(Looper.getMainLooper())
 
   override fun onCreate() {
     super.onCreate()
@@ -36,22 +42,21 @@ class SuProxyVpnService : VpnService() {
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
       ACTION_STOP -> {
-        stopTunnel()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        // Async stop: non-blocking
+        stopTunnelAsync()
         return START_NOT_STICKY
       }
 
       ACTION_START -> {
         val config = intent.getStringExtra(EXTRA_CONFIG)
         if (config.isNullOrBlank()) {
-          VpnStatusEmitter.emit("error")
+          mainHandler.post { VpnStatusEmitter.emit("error") }
           stopSelf()
           return START_NOT_STICKY
         }
 
         startForeground(NOTIFICATION_ID, buildNotification("Connecting…"))
-        VpnStatusEmitter.emit("connecting")
+        mainHandler.post { VpnStatusEmitter.emit("connecting") }
 
         Thread {
           try {
@@ -59,28 +64,45 @@ class SuProxyVpnService : VpnService() {
             val error = engine?.start(config)
             if (error != null) {
               Log.e("SuProxyVpn", error)
-              VpnStatusEmitter.emit("error")
-              stopTunnel()
+              mainHandler.post { VpnStatusEmitter.emit("error") }
+              stopTunnelAsync()
               stopForeground(STOP_FOREGROUND_REMOVE)
               stopSelf()
               return@Thread
             }
 
+            // VPN interface + Xray core started successfully
+            // Now start tunnel (blocking call on this thread)
+            val tunError = engine?.runTunnel()
+            if (tunError != null) {
+              Log.e("SuProxyVpn", "Tunnel start failed: $tunError")
+              mainHandler.post { VpnStatusEmitter.emit("error") }
+              stopTunnelAsync()
+              stopForeground(STOP_FOREGROUND_REMOVE)
+              stopSelf()
+              return@Thread
+            }
+
+            // Tunnel started successfully
             status = "connected"
-            VpnStatusEmitter.emit("connected")
-            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            manager.notify(NOTIFICATION_ID, buildNotification("Connected"))
+            mainHandler.post {
+              VpnStatusEmitter.emit("connected")
+              val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+              manager.notify(NOTIFICATION_ID, buildNotification("Connected"))
+            }
 
             // Blocks until TProxyStopService() is called (ACTION_STOP or onDestroy)
-            engine?.runTunnel()
+            engine?.waitTunnel()
 
-            stopTunnel()
+            // Clean shutdown
+            status = "disconnected"
+            mainHandler.post { VpnStatusEmitter.emit("disconnected") }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
           } catch (e: Exception) {
             Log.e("SuProxyVpn", "VPN start failed", e)
-            VpnStatusEmitter.emit("error")
-            stopTunnel()
+            mainHandler.post { VpnStatusEmitter.emit("error") }
+            stopTunnelAsync()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
           }
@@ -94,25 +116,31 @@ class SuProxyVpnService : VpnService() {
   }
 
   override fun onDestroy() {
-    stopTunnel()
-    instance = null
     status = "disconnected"
-    VpnStatusEmitter.emit("disconnected")
+    instance = null
+    stopTunnelAsync()
+    mainHandler.post { VpnStatusEmitter.emit("disconnected") }
     super.onDestroy()
   }
 
   override fun onRevoke() {
-    stopTunnel()
-    VpnStatusEmitter.emit("disconnected")
+    status = "disconnected"
+    stopTunnelAsync()
+    mainHandler.post { VpnStatusEmitter.emit("disconnected") }
     super.onRevoke()
   }
 
-  private fun stopTunnel() {
-    status = "disconnecting"
-    VpnStatusEmitter.emit("disconnecting")
-    engine?.stop()
-    engine = null
-    status = "disconnected"
+  private fun stopTunnelAsync() {
+    // Non-blocking: run stop on background thread to avoid blocking main/JNI thread
+    stopExecutor.execute {
+      try {
+        engine?.stop()
+      } catch (e: Exception) {
+        Log.e("SuProxyVpn", "Failed to stop tunnel", e)
+      } finally {
+        engine = null
+      }
+    }
   }
 
   private fun createNotificationChannel() {
