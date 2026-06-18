@@ -48,10 +48,13 @@ object XrayRunner {
     return try {
       val controller = coreController ?: return "Xray core not initialized"
       if (controller.getIsRunning()) {
+        Log.i(TAG, "Xray already running")
         return null
       }
+      Log.i(TAG, "Xray starting with config (length=${configJson.length})")
       // tunFd=0: SOCKS inbound + hev-socks5-tunnel handles TUN routing.
       controller.startLoop(configJson, 0)
+      Log.i(TAG, "Xray started successfully")
       null
     } catch (e: Exception) {
       Log.e(TAG, "Xray start failed", e)
@@ -76,12 +79,15 @@ class SuProxyVpnEngine(
   private var vpnInterface: ParcelFileDescriptor? = null
 
   fun start(configJson: String): String? {
+    Log.i(TAG, "SuProxyVpnEngine.start(): initializing Xray")
     XrayRunner.init(service.applicationContext) { fd -> service.protect(fd) }
 
     val xrayError = XrayRunner.start(configJson)
     if (xrayError != null) {
+      Log.e(TAG, "Xray startup error: $xrayError")
       return xrayError
     }
+    Log.i(TAG, "Xray started, now establishing VPN interface")
 
     val builder = service.Builder()
     builder.setSession("SuProxy")
@@ -98,21 +104,24 @@ class SuProxyVpnEngine(
 
     vpnInterface = builder.establish()
       ?: return "Failed to establish VPN interface"
+    Log.i(TAG, "VPN interface established, fd=${vpnInterface?.fd}")
 
     return null
   }
 
   fun runTunnel(): String? {
     val fd = vpnInterface?.fd ?: return "VPN interface is not ready"
+    Log.i(TAG, "Starting TUN tunnel routing (fd=$fd, socksPort=${XrayRunner.socksPort()})")
     return try {
       TProxyService.start(
         service.applicationContext,
         fd,
         XrayRunner.socksPort(),
       )
+      Log.i(TAG, "TProxyService.start() returned successfully")
       null
     } catch (e: Exception) {
-      Log.e("SuProxyVpn", "TUN routing failed", e)
+      Log.e(TAG, "TUN routing failed", e)
       e.message ?: "TUN routing failed"
     }
   }

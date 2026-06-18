@@ -57,28 +57,33 @@ class SuProxyVpnService : VpnService() {
 
         Thread {
           try {
+            Log.i("SuProxyVpn", "VPN start thread: creating engine")
             engine = SuProxyVpnEngine(this)
+            
+            Log.i("SuProxyVpn", "VPN start: establishing interface and starting Xray")
             val error = engine?.start(config)
             if (error != null) {
-              Log.e("SuProxyVpn", error)
+              Log.e("SuProxyVpn", "Engine.start() failed: $error")
               mainHandler.post { VpnStatusEmitter.emit("error") }
               stopTunnelAsync()
               stopForeground(STOP_FOREGROUND_REMOVE)
               stopSelf()
               return@Thread
             }
+            Log.i("SuProxyVpn", "Engine.start() successful, now starting tunnel routing")
 
             // VPN interface + Xray core started successfully
             // Now start tunnel (blocking call on this thread)
             val tunError = engine?.runTunnel()
             if (tunError != null) {
-              Log.e("SuProxyVpn", "Tunnel start failed: $tunError")
+              Log.e("SuProxyVpn", "TProxyService.start() failed: $tunError")
               mainHandler.post { VpnStatusEmitter.emit("error") }
               stopTunnelAsync()
               stopForeground(STOP_FOREGROUND_REMOVE)
               stopSelf()
               return@Thread
             }
+            Log.i("SuProxyVpn", "Tunnel routing started, now waiting for stop signal")
 
             // Tunnel started successfully
             status = "connected"
@@ -87,9 +92,11 @@ class SuProxyVpnService : VpnService() {
               val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
               manager.notify(NOTIFICATION_ID, buildNotification("Connected"))
             }
+            Log.i("SuProxyVpn", "VPN connected, waiting for tunnel to end")
 
             // Blocks until TProxyStopService() is called (ACTION_STOP or onDestroy)
             engine?.waitTunnel()
+            Log.i("SuProxyVpn", "Tunnel stopped, cleaning up")
 
             // Clean shutdown
             status = "disconnected"
@@ -97,7 +104,7 @@ class SuProxyVpnService : VpnService() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
           } catch (e: Exception) {
-            Log.e("SuProxyVpn", "VPN start failed", e)
+            Log.e("SuProxyVpn", "VPN start failed with exception", e)
             mainHandler.post { VpnStatusEmitter.emit("error") }
             stopTunnelAsync()
             stopForeground(STOP_FOREGROUND_REMOVE)
