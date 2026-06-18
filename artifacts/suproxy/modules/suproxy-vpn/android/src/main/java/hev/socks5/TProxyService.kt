@@ -15,6 +15,9 @@ object TProxyService {
   private external fun TProxyStopService()
 
   @JvmStatic
+  private external fun TProxyGetStats(): LongArray
+
+  @JvmStatic
   fun start(context: Context, tunFd: Int, socksPort: Int, socksHost: String = "127.0.0.1") {
     val config = buildString {
       appendLine("misc:")
@@ -36,4 +39,7 @@ object TProxyService {
   fun stop() {
     TProxyStopService()
   }
+
+  @JvmStatic
+  fun stats(): LongArray = TProxyGetStats()
 }
