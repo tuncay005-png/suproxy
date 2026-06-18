@@ -1,0 +1,12 @@
+{
+  "name": "suproxy-vpn",
+  "description": "Native VPN module for SuProxy",
+  "platforms": {
+    "android": {
+      "modules": ["com.app.suproxy.vpn.SuProxyVpnModule"]
+    },
+    "ios": {
+      "modules": []
+    }
+  }
+}
