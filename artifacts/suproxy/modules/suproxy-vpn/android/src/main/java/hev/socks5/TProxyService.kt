@@ -25,9 +25,6 @@ object TProxyService {
   private var tunnelStarted = AtomicBoolean(false)
 
   @JvmStatic
-  private external fun TProxyGetStats(): LongArray
-
-  @JvmStatic
   fun start(context: Context, tunFd: Int, socksPort: Int, socksHost: String = "127.0.0.1") {
     val config = buildString {
       appendLine("misc:")
