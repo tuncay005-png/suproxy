@@ -33,6 +33,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Clear SDK cache
+        run: |
+          rm -rf /opt/hostedtoolcache/android/sdk/ndk/27.1.12297006 || true
+          rm -rf ~/.android/* || true
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
