@@ -49,7 +49,8 @@ class SuProxyVpnModule : Module() {
         action = SuProxyVpnService.ACTION_START
         putExtra(SuProxyVpnService.EXTRA_CONFIG, configJson)
       }
-      context.startForegroundService(intent)
+      // Use application context to avoid ContextWrapper ComponentName issues
+      context.applicationContext.startForegroundService(intent)
     }
 
     AsyncFunction("stop") {
@@ -58,7 +59,7 @@ class SuProxyVpnModule : Module() {
         val intent = Intent(context, SuProxyVpnService::class.java).apply {
           action = SuProxyVpnService.ACTION_STOP
         }
-        context.startService(intent)
+        context.applicationContext.startService(intent)
       }
     }
 
