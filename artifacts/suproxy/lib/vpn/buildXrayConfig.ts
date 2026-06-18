@@ -136,6 +136,25 @@ export function buildXrayClientConfig(
     routing: {
       domainStrategy: "AsIs",
       rules: [
+        // Route internal/loopback traffic directly (don't proxy)
+        {
+          type: "field",
+          ip: ["127.0.0.0/8", "::1/128"],
+          outboundTag: "direct",
+        },
+        // Route VPN server itself directly to prevent routing loop
+        {
+          type: "field",
+          ip: [profile.address],
+          outboundTag: "direct",
+        },
+        // Route DNS servers directly
+        {
+          type: "field",
+          ip: ["1.1.1.1", "8.8.8.8"],
+          outboundTag: "direct",
+        },
+        // All other traffic goes through proxy
         {
           type: "field",
           outboundTag: "proxy",
