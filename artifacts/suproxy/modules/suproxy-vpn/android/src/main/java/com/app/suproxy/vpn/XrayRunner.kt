@@ -30,7 +30,7 @@ object XrayRunner {
     }
 
     // libv2ray calls this to protect outbound sockets from being routed into TUN
-    override fun protect(fd: Long): Boolean {
+    fun protect(fd: Long): Boolean {
       return protectFd?.invoke(fd.toInt()) ?: false
     }
   }

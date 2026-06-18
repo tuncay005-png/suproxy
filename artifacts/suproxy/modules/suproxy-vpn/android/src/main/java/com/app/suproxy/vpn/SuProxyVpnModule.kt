@@ -45,21 +45,23 @@ class SuProxyVpnModule : Module() {
 
     AsyncFunction("start") { configJson: String ->
       val context = appContext.reactContext ?: throw Exception("React context unavailable")
-      val intent = Intent(context, SuProxyVpnService::class.java).apply {
+      val applicationContext = context.applicationContext
+      val intent = Intent(applicationContext, SuProxyVpnService::class.java).apply {
         action = SuProxyVpnService.ACTION_START
         putExtra(SuProxyVpnService.EXTRA_CONFIG, configJson)
       }
       // Use application context to avoid ContextWrapper ComponentName issues
-      context.applicationContext.startForegroundService(intent)
+      applicationContext.startForegroundService(intent)
     }
 
     AsyncFunction("stop") {
       val context = appContext.reactContext
       if (context != null) {
-        val intent = Intent(context, SuProxyVpnService::class.java).apply {
+        val applicationContext = context.applicationContext
+        val intent = Intent(applicationContext, SuProxyVpnService::class.java).apply {
           action = SuProxyVpnService.ACTION_STOP
         }
-        context.applicationContext.startService(intent)
+        applicationContext.startService(intent)
       }
     }
 
