@@ -40,37 +40,12 @@ function readSecurity(value: string | null): ParsedVlessProfile["security"] {
 }
 
 function validateEncryption(raw: string): string {
-  // Xray-core supported encryptions (VLESS)
-  const validEncryptions = [
-    "none",
-    "aes-128-gcm",
-    "aes-256-gcm",
-    "chacha20-poly1305",
-    "auto",
-  ];
-  
-  // If encryption contains dots or is very long, it's likely a malformed key exchange param
-  if (raw.includes(".") || raw.length > 30) {
-    console.warn(
-      `Invalid encryption format: "${raw}". This looks like a key exchange parameter, not encryption method.`,
-    );
-    // Try to extract the base method (first part before dot)
-    const base = raw.split(".")[0];
-    if (validEncryptions.includes(base)) {
-      return base;
-    }
-    // Default to none if can't parse
-    return "none";
-  }
-  
-  // If it's a valid encryption, return it
-  if (validEncryptions.includes(raw)) {
-    return raw;
-  }
-  
-  // Unknown encryption, default to none
-  console.warn(`Unknown encryption: "${raw}", defaulting to "none"`);
-  return "none";
+  // CRITICAL: Do NOT validate or modify the encryption parameter!
+  // Xray-core handles encryption strings natively, including:
+  // - Standard: none, aes-128-gcm, chacha20-poly1305
+  // - Post-quantum: mlkem768x25519plus and other key exchange params
+  // Pass the raw value unchanged to preserve server configuration
+  return raw;
 }
 
 export function parseVlessUrl(raw: string): ParsedVlessProfile {
