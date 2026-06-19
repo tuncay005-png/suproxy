@@ -184,7 +184,7 @@ class VpnServiceImpl {
       }
 
       await this.getModule().start(configJson);
-      await this.waitForStatus(["connected", "error"], 45_000);
+      await this.waitForStatus(["connected", "error"], 90_000);
       if (this.state.status === "error") {
         throw new VpnError(this.state.error ?? "VPN connection failed", "CONNECT_FAILED");
       }
