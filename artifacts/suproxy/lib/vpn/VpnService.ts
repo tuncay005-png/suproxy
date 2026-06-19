@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { parseVlessUrl } from "@/lib/vpn/parseVlessUrl";
 import { buildXrayClientConfig } from "@/lib/vpn/buildXrayConfig";
@@ -27,6 +27,7 @@ class VpnServiceImpl {
   private activeKey: string | null = null;
   private unsubscribeNative: (() => void) | null = null;
   private module: NativeVpnModule | null = null;
+  private appStateSubscription: any = null;
 
   constructor() {
     this.unsubscribeNative = subscribeNativeVpnEvents((status) => {
@@ -40,6 +41,76 @@ class VpnServiceImpl {
       }
       this.setStatus(status);
     });
+
+    // Sync state when app comes to foreground to handle background disconnections
+    // or state changes while app was backgrounded
+    this.appStateSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void this.syncStatus();
+      }
+    });
+  }
+
+  getState(): VpnState {
+    return this.state;
+  }
+
+  subscribe(listener: Listener): () => void {
+    this.listeners.add(listener);
+    listener(this.state);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  setActiveKey(vlessUrl: string | null): void {
+    this.activeKey = vlessUrl;
+    if (!vlessUrl && this.state.status !== "disconnected") {
+      void this.disconnect();
+    }
+  }
+
+  private getModule(): NativeVpnModule {
+    if (!this.module) {
+      this.module = resolveVpnModule();
+    }
+    return this.module;
+  }
+
+  /** Sync UI state with native VPN service status */
+  private async syncStatus(): Promise<void> {
+    try {
+      const nativeStatus = await this.getModule().getStatus();
+      if (nativeStatus !== this.state.status) {
+        console.log(
+          `[VpnService] State sync: local=${this.state.status}, native=${nativeStatus}`,
+        );
+        // Update to native status if it differs
+        if (nativeStatus === "connected") {
+          this.setStatus("connected", null, this.state.connectedAt ?? Date.now());
+        } else if (nativeStatus === "disconnected") {
+          this.setStatus("disconnected", null);
+        } else {
+          this.setStatus(nativeStatus as VpnStatus);
+        }
+      }
+    } catch (error) {
+      // Silently ignore errors during status sync
+      // Native service may not be available
+    }
+  }
+
+  destroy(): void {
+    // Clean up AppState listener
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+    // Clean up native event listener
+    if (this.unsubscribeNative) {
+      this.unsubscribeNative();
+      this.unsubscribeNative = null;
+    }
   }
 
   getState(): VpnState {
