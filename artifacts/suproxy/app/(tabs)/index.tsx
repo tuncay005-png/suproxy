@@ -127,21 +127,15 @@ export default function HomeScreen() {
   // Periodic status check every 2 seconds to prevent UI desync
   // Ensures button always shows accurate VPN connection status
   useEffect(() => {
-    const statusCheckInterval = setInterval(async () => {
+    const statusCheckInterval = setInterval(() => {
       try {
-        const status = await vpnService.getModule().getStatus();
-        const currentState = vpnService.getState();
-        if (status !== currentState.status) {
-          console.log(
-            `[HomeScreen] Status mismatch detected: local=${currentState.status}, native=${status}. Syncing...`,
-          );
-          // Force state sync by querying native module
-          // This will be handled by VpnService's internal sync
-        }
+        // Attempt to sync VPN status from native module
+        // This ensures UI state matches actual VPN connection state
+        void vpnService.syncStatus?.();
       } catch (error) {
         // Silently ignore errors in periodic checks
       }
-    }, 2000); // Check every 2 seconds
+    }, 2000);
 
     return () => clearInterval(statusCheckInterval);
   }, []);
@@ -173,7 +167,15 @@ export default function HomeScreen() {
       Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
     ]).start();
 
-    void toggle();
+    // Execute toggle and always reset lock, regardless of success/failure
+    toggle()
+      .catch((err) => {
+        console.log("[HomeScreen] Toggle error:", err);
+        // Error is already handled by VpnService, just ensure lock is released
+      })
+      .finally(() => {
+        setToggleLocked(false);
+      });
   };
 
   const importKeyInput = async (raw: string) => {

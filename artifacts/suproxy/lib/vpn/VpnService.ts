@@ -78,7 +78,7 @@ class VpnServiceImpl {
   }
 
   /** Sync UI state with native VPN service status */
-  private async syncStatus(): Promise<void> {
+  async syncStatus(): Promise<void> {
     try {
       const nativeStatus = await this.getModule().getStatus();
       if (nativeStatus !== this.state.status) {
