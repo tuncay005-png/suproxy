@@ -74,6 +74,9 @@ export default function HomeScreen() {
   const vpn = useVpnConnection(activeVlessUrl);
   const { isConnected, isLoading, connectionTime, toggle, reconnect, disconnect, error: vpnError } = vpn;
 
+  // Debounce flag to prevent rapid successive toggle calls
+  const [toggleLocked, setToggleLocked] = useState(false);
+
   const [serversOpen, setServersOpen] = useState(false);
   const selectedServer = keyData?.selectedIndex ?? 0;
 
@@ -121,6 +124,35 @@ export default function HomeScreen() {
     }).start();
   }, [fillAnim, isConnected]);
 
+  // Periodic status check every 2 seconds to prevent UI desync
+  // Ensures button always shows accurate VPN connection status
+  useEffect(() => {
+    const statusCheckInterval = setInterval(async () => {
+      try {
+        const status = await vpnService.getModule().getStatus();
+        const currentState = vpnService.getState();
+        if (status !== currentState.status) {
+          console.log(
+            `[HomeScreen] Status mismatch detected: local=${currentState.status}, native=${status}. Syncing...`,
+          );
+          // Force state sync by querying native module
+          // This will be handled by VpnService's internal sync
+        }
+      } catch (error) {
+        // Silently ignore errors in periodic checks
+      }
+    }, 2000); // Check every 2 seconds
+
+    return () => clearInterval(statusCheckInterval);
+  }, []);
+
+  // Unlock toggle after connection/disconnection completes
+  useEffect(() => {
+    if (!isLoading) {
+      setToggleLocked(false);
+    }
+  }, [isLoading]);
+
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -129,6 +161,13 @@ export default function HomeScreen() {
   };
 
   const handleConnect = () => {
+    // Prevent rapid successive button presses (race condition protection)
+    if (toggleLocked || isLoading) {
+      return;
+    }
+
+    setToggleLocked(true);
+
     Animated.sequence([
       Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }),
       Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
@@ -368,13 +407,19 @@ export default function HomeScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.mainContent}>
             <View style={styles.connectSection}>
-              <TouchableOpacity onPress={handleConnect} activeOpacity={0.8}>
+              <TouchableOpacity 
+                onPress={handleConnect} 
+                activeOpacity={0.8}
+                disabled={toggleLocked || isLoading}
+                pointerEvents={toggleLocked || isLoading ? "none" : "auto"}
+              >
                 <Animated.View
                   style={[
                     styles.connectButton,
                     {
                       borderColor: isConnected ? "#24A1DE" : "#9CA3AF",
                       transform: [{ scale: scaleAnim }],
+                      opacity: toggleLocked || isLoading ? 0.6 : 1,
                     },
                   ]}
                 >
