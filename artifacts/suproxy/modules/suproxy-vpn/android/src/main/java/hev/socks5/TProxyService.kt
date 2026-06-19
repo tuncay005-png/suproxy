@@ -58,8 +58,13 @@ object TProxyService {
 
   @JvmStatic
   fun waitRunning() {
-    // Block until stop() is called (latch reaches 0) or 60s timeout
-    stopLatch?.await(60, TimeUnit.SECONDS)
+    // Block indefinitely until stop() is called (latch reaches 0)
+    // Never timeout - this was causing premature disconnects at 60 seconds
+    try {
+      stopLatch?.await()
+    } catch (e: InterruptedException) {
+      Log.e("TProxyService", "waitRunning interrupted", e)
+    }
   }
 
   @JvmStatic

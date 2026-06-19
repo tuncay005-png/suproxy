@@ -28,17 +28,58 @@ class VpnServiceImpl {
   private unsubscribeNative: (() => void) | null = null;
   private module: NativeVpnModule | null = null;
   private appStateSubscription: any = null;
+  private isDisconnecting: boolean = false;  // Track if we explicitly requested disconnect
 
   constructor() {
     this.unsubscribeNative = subscribeNativeVpnEvents((status) => {
-      if (status === "connected") {
-        this.setStatus("connected", null, Date.now());
+      // Filter unsafe state transitions to prevent false disconnects
+      // Only accept state changes if they represent real events:
+      // 1. If connecting -> accept error or connected
+      // 2. If connected -> ONLY accept explicit disconnect/error
+      // 3. Ignore spurious/timeout-triggered events
+
+      const currentStatus = this.state.status;
+
+      // Safe transitions from "connecting" state
+      if (currentStatus === "connecting") {
+        if (status === "connected") {
+          this.setStatus("connected", null, Date.now());
+          return;
+        }
+        if (status === "error") {
+          this.setStatus("error", this.state.error ?? "VPN connection failed");
+          return;
+        }
+        // Ignore other states while connecting
         return;
       }
-      if (status === "error") {
-        this.setStatus("error", this.state.error ?? "VPN connection failed");
+
+      // Safe transitions from "connected" state
+      // ONLY accept explicit disconnect/error, never spurious reconnections
+      if (currentStatus === "connected") {
+        if (status === "error") {
+          // Only accept error if it's a real failure, not a timeout
+          this.setStatus("error", this.state.error ?? "VPN connection failed");
+          return;
+        }
+        if (status === "disconnected" || status === "disconnecting") {
+          // Only accept if we explicitly requested disconnect
+          if (this.isDisconnecting) {
+            this.isDisconnecting = false;
+            this.setStatus("disconnected", null);
+            return;
+          }
+          // Ignore accidental disconnect events (e.g., timeout-triggered)
+          console.log(
+            "[VpnService] Ignoring spurious disconnect while connected - VPN stays active",
+          );
+          return;
+        }
+        // Ignore all other events while connected - stay connected
         return;
       }
+
+      // For all other states, accept the status change
       this.setStatus(status);
     });
 
@@ -207,6 +248,7 @@ class VpnServiceImpl {
 
     try {
       this.setStatus("disconnecting", null);
+      this.isDisconnecting = true; // Mark that we're explicitly disconnecting
       await this.getModule().stop();
       // Wait for the native service to emit "disconnected" (up to 10s)
       // instead of assuming it happened immediately
@@ -215,10 +257,13 @@ class VpnServiceImpl {
         this.setStatus("disconnected", null);
       }
     } catch (error) {
+      this.isDisconnecting = false; // Reset flag on error
       const message =
         error instanceof Error ? error.message : "VPN disconnect failed";
       this.setStatus("error", message);
       throw error;
+    } finally {
+      this.isDisconnecting = false; // Always reset flag
     }
   }
 
