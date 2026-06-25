@@ -36,22 +36,6 @@ export function useVpnConnection(activeKey: string | null) {
     return () => clearInterval(interval);
   }, [state.status, state.connectedAt]);
 
-  // Continuous status verification - query native module every 2 seconds
-  // to ensure UI state always matches actual VPN connection status
-  useEffect(() => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const currentState = vpnService.getState();
-        // Force sync to ensure state is current
-        // This helps catch stale UI state from backgrounding
-      } catch (error) {
-        // Silently handle polling errors
-      }
-    }, 2000);
-
-    return () => clearInterval(pollInterval);
-  }, []);
-
   const toggle = useCallback(async () => {
     await vpnService.toggle();
   }, []);

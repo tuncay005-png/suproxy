@@ -64,11 +64,13 @@ public class SuProxyVpnModule: Module {
       try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
         NETunnelProviderManager.loadAllFromPreferences { managers, error in
           if let error = error {
+            self.sendEvent("SuProxyVpnStatusChanged", ["status": "error"])
             continuation.resume(throwing: error)
             return
           }
 
           guard let manager = managers?.first else {
+            self.sendEvent("SuProxyVpnStatusChanged", ["status": "error"])
             continuation.resume(throwing: NSError(
               domain: "SuProxyVpn",
               code: 1,
@@ -77,13 +79,16 @@ public class SuProxyVpnModule: Module {
             return
           }
 
+          // FAST PATH: Start VPN tunnel immediately, don't wait
           do {
             try manager.connection.startVPNTunnel(options: [
               "config": configJson as NSString
             ])
-            self.sendEvent("SuProxyVpnStatusChanged", ["status": "connected"])
+            NSLog("[SuProxyVpn] VPN tunnel start command sent (fast path)")
+            // Don't emit "connected" here - let the adapter check tunnel ready state
             continuation.resume()
           } catch {
+            NSLog("[SuProxyVpn] Failed to start VPN tunnel: \(error.localizedDescription)")
             self.sendEvent("SuProxyVpnStatusChanged", ["status": "error"])
             continuation.resume(throwing: error)
           }

@@ -3,15 +3,16 @@ import { AppState, Platform } from "react-native";
 import { parseVlessUrl } from "@/lib/vpn/parseVlessUrl";
 import { buildXrayClientConfig } from "@/lib/vpn/buildXrayConfig";
 import {
-  resolveVpnModule,
   subscribeNativeVpnEvents,
-  type NativeVpnModule,
 } from "@/lib/vpn/VpnBridge";
 import {
   VpnError,
   type VpnState,
   type VpnStatus,
 } from "@/lib/vpn/types";
+import type { IVpnAdapter } from "@/lib/vpn/adapters/IVpnAdapter";
+import { AndroidVpnAdapter } from "@/lib/vpn/adapters/AndroidVpnAdapter";
+import { IosVpnAdapter } from "@/lib/vpn/adapters/IosVpnAdapter";
 
 type Listener = (state: VpnState) => void;
 
@@ -26,11 +27,21 @@ class VpnServiceImpl {
   private listeners = new Set<Listener>();
   private activeKey: string | null = null;
   private unsubscribeNative: (() => void) | null = null;
-  private module: NativeVpnModule | null = null;
+  private adapter: IVpnAdapter;
   private appStateSubscription: any = null;
   private isDisconnecting: boolean = false;  // Track if we explicitly requested disconnect
+  
+  // Configuration: timeouts and intervals
+  private readonly CORE_READY_TIMEOUT_MS = 5000; // 5 seconds max for core readiness
+  private readonly HEALTH_CHECK_TIMEOUT_MS = 3000; // 3 seconds for health check
+  private readonly CONNECT_OVERALL_TIMEOUT_MS = 90000; // 90 seconds overall connection timeout
 
   constructor() {
+    // Initialize platform-specific adapter
+    this.adapter = Platform.OS === "ios" 
+      ? new IosVpnAdapter() 
+      : new AndroidVpnAdapter();
+    
     this.unsubscribeNative = subscribeNativeVpnEvents((status) => {
       // Filter unsafe state transitions to prevent false disconnects
       // Only accept state changes if they represent real events:
@@ -111,17 +122,10 @@ class VpnServiceImpl {
     }
   }
 
-  private getModule(): NativeVpnModule {
-    if (!this.module) {
-      this.module = resolveVpnModule();
-    }
-    return this.module;
-  }
-
   /** Sync UI state with native VPN service status */
   async syncStatus(): Promise<void> {
     try {
-      const nativeStatus = await this.getModule().getStatus();
+      const nativeStatus = await this.adapter.getStatus();
       if (nativeStatus !== this.state.status) {
         console.log(
           `[VpnService] State sync: local=${this.state.status}, native=${nativeStatus}`,
@@ -196,6 +200,14 @@ class VpnServiceImpl {
     await this.connect();
   }
 
+  /**
+   * Connect to VPN with fast path + retry + health check.
+   * 1. Start VPN immediately (FAST PATH - no waiting)
+   * 2. UI goes to "connecting" state immediately
+   * 3. Wait for core to be ready (port/tunnel ready) with retry
+   * 4. Perform health check to verify real internet connectivity
+   * 5. Only then mark as "connected"
+   */
   async connect(): Promise<void> {
     if (!this.activeKey) {
       throw new VpnError("No VLESS key configured", "NO_KEY");
@@ -208,27 +220,62 @@ class VpnServiceImpl {
       return;
     }
 
-    try {
-      this.setStatus("connecting", null);
+    const startTime = Date.now();
 
+    try {
+      // Set connecting state immediately (UI feedback)
+      this.setStatus("connecting", null);
+      console.log("[VpnService] Starting VPN connection (fast path)");
+
+      // Parse profile and build config
       const profile = parseVlessUrl(this.activeKey);
       const configJson = buildXrayClientConfig(profile, {
         tunInbound: Platform.OS === "ios",
         socksPort: 10808,
       });
 
-      if (this.getModule().prepare) {
-        const ready = await this.getModule().prepare();
-        if (!ready) {
-          throw new VpnError("VPN permission was denied", "PERMISSION_DENIED");
-        }
+      // Prepare VPN permissions
+      const permissionGranted = await this.adapter.prepare();
+      if (!permissionGranted) {
+        throw new VpnError("VPN permission was denied", "PERMISSION_DENIED");
       }
 
-      await this.getModule().start(configJson);
-      await this.waitForStatus(["connected", "error"], 90_000);
-      if (this.state.status === "error") {
-        throw new VpnError(this.state.error ?? "VPN connection failed", "CONNECT_FAILED");
+      // FAST PATH: Start VPN immediately without waiting
+      await this.adapter.start(configJson);
+      console.log("[VpnService] VPN start command sent (fast path)");
+
+      // Wait for core to be ready (port listening / tunnel established)
+      // Uses retry mechanism with short intervals (NO fixed delays)
+      console.log("[VpnService] Waiting for VPN core to be ready...");
+      const coreReady = await this.adapter.waitForCoreReady(this.CORE_READY_TIMEOUT_MS);
+      
+      if (!coreReady) {
+        throw new VpnError(
+          "VPN core failed to initialize within timeout",
+          "CORE_NOT_READY"
+        );
       }
+
+      const coreReadyTime = Date.now() - startTime;
+      console.log(`[VpnService] VPN core ready in ${coreReadyTime}ms`);
+
+      // Perform health check to verify real internet connectivity
+      // This prevents "connected but no internet" problem
+      console.log("[VpnService] Performing health check...");
+      const healthOk = await this.adapter.healthCheck(this.HEALTH_CHECK_TIMEOUT_MS);
+      
+      if (!healthOk) {
+        throw new VpnError(
+          "VPN connected but internet is not working",
+          "HEALTH_CHECK_FAILED"
+        );
+      }
+
+      const totalTime = Date.now() - startTime;
+      console.log(`[VpnService] VPN connected successfully in ${totalTime}ms (core: ${coreReadyTime}ms)`);
+
+      // Mark as connected only after health check passes
+      this.setStatus("connected", null, Date.now());
     } catch (error) {
       const message =
         error instanceof VpnError
@@ -236,7 +283,17 @@ class VpnServiceImpl {
           : error instanceof Error
             ? error.message
             : "VPN connection failed";
+      
+      console.error("[VpnService] Connection failed:", message);
       this.setStatus("error", message);
+      
+      // Clean up: try to stop the VPN
+      try {
+        await this.adapter.stop();
+      } catch (stopError) {
+        // Ignore cleanup errors
+      }
+      
       throw error;
     }
   }
@@ -249,17 +306,23 @@ class VpnServiceImpl {
     try {
       this.setStatus("disconnecting", null);
       this.isDisconnecting = true; // Mark that we're explicitly disconnecting
-      await this.getModule().stop();
+      console.log("[VpnService] Disconnecting VPN...");
+      
+      await this.adapter.stop();
+      
       // Wait for the native service to emit "disconnected" (up to 10s)
       // instead of assuming it happened immediately
       await this.waitForStatus(["disconnected", "error"], 10_000);
       if (this.state.status !== "disconnected") {
         this.setStatus("disconnected", null);
       }
+      
+      console.log("[VpnService] VPN disconnected successfully");
     } catch (error) {
       this.isDisconnecting = false; // Reset flag on error
       const message =
         error instanceof Error ? error.message : "VPN disconnect failed";
+      console.error("[VpnService] Disconnect failed:", message);
       this.setStatus("error", message);
       throw error;
     } finally {

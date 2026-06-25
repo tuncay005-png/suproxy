@@ -55,11 +55,38 @@ object XrayRunner {
       Log.i(TAG, "Xray starting with config (length=${configJson.length})")
       // tunFd=0: SOCKS inbound + hev-socks5-tunnel handles TUN routing.
       controller.startLoop(configJson, 0)
-      Log.i(TAG, "Xray started successfully")
+      Log.i(TAG, "Xray core startLoop() called - core is starting")
       null
     } catch (e: Exception) {
       Log.e(TAG, "Xray start failed", e)
       e.message
+    }
+  }
+
+  /**
+   * Check if SOCKS proxy port is ready and accepting connections.
+   * @return true if port is listening, false otherwise
+   */
+  fun isPortReady(): Boolean {
+    return try {
+      val controller = coreController ?: return false
+      // Check if core is running
+      if (!controller.getIsRunning()) {
+        return false
+      }
+      
+      // Try to connect to SOCKS port
+      val socket = java.net.Socket()
+      try {
+        socket.connect(java.net.InetSocketAddress("127.0.0.1", SOCKS_PORT), 500)
+        socket.close()
+        true
+      } catch (e: Exception) {
+        false
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Port readiness check failed", e)
+      false
     }
   }
 
@@ -88,7 +115,32 @@ class SuProxyVpnEngine(
       Log.e(TAG, "Xray startup error: $xrayError")
       return xrayError
     }
-    Log.i(TAG, "Xray started, now establishing VPN interface")
+    Log.i(TAG, "Xray core started, waiting for SOCKS port to be ready...")
+
+    // FAST PATH + RETRY: Wait for SOCKS port to be ready (NO fixed delay)
+    // This prevents "connected but no traffic" problem
+    val portReadyStartTime = System.currentTimeMillis()
+    val portReadyTimeout = 5000L // 5 seconds max
+    var portReady = false
+    
+    while (System.currentTimeMillis() - portReadyStartTime < portReadyTimeout) {
+      if (XrayRunner.isPortReady()) {
+        portReady = true
+        val elapsed = System.currentTimeMillis() - portReadyStartTime
+        Log.i(TAG, "SOCKS port ready in ${elapsed}ms")
+        break
+      }
+      // Short sleep between retries
+      Thread.sleep(100)
+    }
+    
+    if (!portReady) {
+      Log.e(TAG, "SOCKS port failed to become ready within timeout")
+      XrayRunner.stop()
+      return "SOCKS proxy port failed to initialize"
+    }
+
+    Log.i(TAG, "SOCKS port ready, now establishing VPN interface")
 
     val builder = service.Builder()
     builder.setSession("SuProxy")
