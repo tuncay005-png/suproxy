@@ -60,6 +60,10 @@ class SuProxyVpnModule : Module() {
     AsyncFunction("start") { configJson: String ->
       val context = appContext.reactContext ?: throw Exception("React context unavailable")
       val applicationContext = context.applicationContext
+      
+      // Save config for Quick Settings Tile
+      VpnConfigStore.saveConfig(applicationContext, configJson)
+      
       val intent = Intent(applicationContext, SuProxyVpnService::class.java).apply {
         action = SuProxyVpnService.ACTION_START
         putExtra(SuProxyVpnService.EXTRA_CONFIG, configJson)
@@ -94,6 +98,20 @@ class SuProxyVpnModule : Module() {
       }
     }
 
+    AsyncFunction("setActiveKey") { hasKey: Boolean ->
+      val context = appContext.reactContext
+      if (context != null) {
+        val applicationContext = context.applicationContext
+        if (hasKey) {
+          // User has set an active VLESS key - no need to do anything, config will be saved on start
+        } else {
+          // User removed active VLESS key - clear the flag
+          VpnConfigStore.clearActiveKey(applicationContext)
+          Log.i(TAG, "setActiveKey() - Active key cleared")
+        }
+      }
+    }
+
     OnActivityResult { _, result ->
       if (result.requestCode == VPN_PREPARE_REQUEST) {
         preparePromise?.resolve(result.resultCode == Activity.RESULT_OK)
@@ -117,6 +135,15 @@ object VpnStatusEmitter {
   fun emit(status: String) {
     handler?.post {
       module?.sendEvent("SuProxyVpnStatusChanged", mapOf("status" to status))
+      
+      // Update Quick Settings Tile
+      try {
+        module?.appContext?.reactContext?.applicationContext?.let { context ->
+          SuProxyVpnTile.requestUpdate(context)
+        }
+      } catch (e: Exception) {
+        Log.e("VpnStatusEmitter", "Failed to update tile", e)
+      }
     }
   }
 }

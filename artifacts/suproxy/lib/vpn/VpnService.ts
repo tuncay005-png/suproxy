@@ -3,6 +3,7 @@ import { AppState, Platform } from "react-native";
 import { parseVlessUrl } from "@/lib/vpn/parseVlessUrl";
 import { buildXrayClientConfig } from "@/lib/vpn/buildXrayConfig";
 import {
+  resolveVpnModule,
   subscribeNativeVpnEvents,
 } from "@/lib/vpn/VpnBridge";
 import {
@@ -172,16 +173,24 @@ class VpnServiceImpl {
 
   setActiveKey(vlessUrl: string | null): void {
     this.activeKey = vlessUrl;
+    
+    // Notify Android native module about active key status (for Quick Settings Tile)
+    if (Platform.OS === "android") {
+      try {
+        const module = resolveVpnModule();
+        if (module?.setActiveKey) {
+          module.setActiveKey(vlessUrl !== null).catch((error: Error) => {
+            console.warn("[VpnService] Failed to update active key status:", error);
+          });
+        }
+      } catch (error) {
+        console.warn("[VpnService] Failed to notify native about active key:", error);
+      }
+    }
+    
     if (!vlessUrl && this.state.status !== "disconnected") {
       void this.disconnect();
     }
-  }
-
-  private getModule(): NativeVpnModule {
-    if (!this.module) {
-      this.module = resolveVpnModule();
-    }
-    return this.module;
   }
 
   async toggle(): Promise<void> {

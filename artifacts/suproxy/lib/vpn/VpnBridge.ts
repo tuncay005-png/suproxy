@@ -7,6 +7,7 @@ export interface NativeVpnModule {
   stop(): Promise<void>;
   getStatus(): Promise<VpnStatus>;
   prepare?: () => Promise<boolean>;
+  setActiveKey?: (hasKey: boolean) => Promise<void>;
 }
 
 const MODULE_NAME = "SuProxyVpn";
