@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+  SuProxy Quick Settings Tile Icon
+  Monochrome "S" logo matching the in-app VPN button design
+  
+  A clean, bold "S" letter optimized for Quick Settings tiles.
+  Uses simple paths for clarity at small sizes.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  
+  <!-- Bold "S" letter with rounded edges -->
+  <path
+      android:fillColor="#FFFFFFFF"
+      android:pathData="M16.5,6.5C16.5,5.1,15.4,4,14,4H10C8.6,4,7.5,5.1,7.5,6.5c0,1.4,1.1,2.5,2.5,2.5h4c2.2,0,4,1.8,4,4c0,2.2-1.8,4-4,4h-4c-2.2,0-4-1.8-4-4"
+      android:strokeWidth="2.5"
+      android:strokeColor="#FFFFFFFF"
+      android:strokeLineCap="round"
+      android:fillType="nonZero"/>
+</vector>

@@ -161,37 +161,37 @@ class SuProxyVpnTile : TileService() {
     when (status) {
       "disconnected" -> {
         tile.state = Tile.STATE_INACTIVE
-        tile.label = "SuProxy VPN"
+        tile.label = "SuProxy"
         tile.subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "Tap to connect" else null
-        tile.icon = Icon.createWithResource(applicationContext, android.R.drawable.ic_lock_lock)
+        tile.icon = Icon.createWithResource(applicationContext, R.drawable.ic_suproxy_tile)
       }
       
       "connecting" -> {
         tile.state = Tile.STATE_ACTIVE
-        tile.label = "SuProxy VPN"
+        tile.label = "SuProxy"
         tile.subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "Connecting..." else null
-        tile.icon = Icon.createWithResource(applicationContext, android.R.drawable.ic_lock_lock)
+        tile.icon = Icon.createWithResource(applicationContext, R.drawable.ic_suproxy_tile)
       }
       
       "connected" -> {
         tile.state = Tile.STATE_ACTIVE
-        tile.label = "SuProxy VPN"
+        tile.label = "SuProxy"
         tile.subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "Connected" else null
-        tile.icon = Icon.createWithResource(applicationContext, android.R.drawable.ic_lock_lock)
+        tile.icon = Icon.createWithResource(applicationContext, R.drawable.ic_suproxy_tile)
       }
       
       "disconnecting" -> {
         tile.state = Tile.STATE_UNAVAILABLE
-        tile.label = "SuProxy VPN"
+        tile.label = "SuProxy"
         tile.subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "Disconnecting..." else null
-        tile.icon = Icon.createWithResource(applicationContext, android.R.drawable.ic_lock_lock)
+        tile.icon = Icon.createWithResource(applicationContext, R.drawable.ic_suproxy_tile)
       }
       
       "error" -> {
         tile.state = Tile.STATE_INACTIVE
-        tile.label = "SuProxy VPN"
+        tile.label = "SuProxy"
         tile.subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "Error - Tap to retry" else null
-        tile.icon = Icon.createWithResource(applicationContext, android.R.drawable.ic_lock_lock)
+        tile.icon = Icon.createWithResource(applicationContext, R.drawable.ic_suproxy_tile)
       }
     }
     
@@ -204,10 +204,11 @@ class SuProxyVpnTile : TileService() {
   private fun showUnavailable(message: String) {
     val tile = qsTile ?: return
     tile.state = Tile.STATE_UNAVAILABLE
-    tile.label = "SuProxy VPN"
+    tile.label = "SuProxy"
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       tile.subtitle = message
     }
+    tile.icon = Icon.createWithResource(applicationContext, R.drawable.ic_suproxy_tile)
     tile.updateTile()
   }
 
@@ -217,10 +218,11 @@ class SuProxyVpnTile : TileService() {
   private fun showError(message: String) {
     val tile = qsTile ?: return
     tile.state = Tile.STATE_INACTIVE
-    tile.label = "SuProxy VPN"
+    tile.label = "SuProxy"
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       tile.subtitle = message
     }
+    tile.icon = Icon.createWithResource(applicationContext, R.drawable.ic_suproxy_tile)
     tile.updateTile()
   }
 

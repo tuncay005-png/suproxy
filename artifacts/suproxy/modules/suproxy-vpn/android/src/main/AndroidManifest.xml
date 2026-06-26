@@ -9,8 +9,8 @@
     <service
       android:name=".SuProxyVpnTile"
       android:exported="true"
-      android:icon="@android:drawable/ic_lock_lock"
-      android:label="SuProxy VPN"
+      android:icon="@drawable/ic_suproxy_tile"
+      android:label="SuProxy"
       android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
       <intent-filter>
         <action android:name="android.service.quicksettings.action.QS_TILE" />
