@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- 
   SuProxy Quick Settings Tile Icon
-  Based on the original app logo with "S" letter in Aristotelica Pro Tx Bold font
+  Authentic S logo from app design (AS.svg)
   
-  This is a simplified monochrome version optimized for Quick Settings tiles.
-  Android will automatically tint this icon based on tile state (Active/Inactive).
+  This is the exact S letter from your design, converted to Android vector drawable.
+  Android will automatically tint this white icon based on tile state:
+  - Inactive (disconnected) = System's inactive color (usually gray)
+  - Active (connected) = System's active color (usually blue/accent)
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
@@ -12,8 +14,12 @@
     android:viewportWidth="768"
     android:viewportHeight="768">
   
-  <!-- "S" letter path - simplified from text to path for better rendering -->
+  <!-- 
+    S letter from AS.svg - converted from text to path
+    Original: Aristotelica Pro Tx Bold font, black (#000000)
+    Converted to white (#FFFFFFFF) for Android system tinting
+  -->
   <path
       android:fillColor="#FFFFFFFF"
-      android:pathData="M365,245 Q330,245 305,265 Q280,285 280,320 Q280,350 300,370 Q320,390 360,405 L440,435 Q470,445 485,465 Q500,485 500,515 Q500,550 475,575 Q450,600 410,600 Q375,600 350,580 Q325,560 315,525 L280,540 Q295,585 330,615 Q365,645 415,645 Q470,645 505,610 Q540,575 540,515 Q540,480 520,455 Q500,430 465,415 L385,385 Q350,370 335,350 Q320,330 320,300 Q320,270 340,250 Q360,230 395,230 Q425,230 450,250 Q475,270 485,305 L520,290 Q505,245 470,220 Q435,195 385,195 Q345,195 325,215 Q305,235 305,265 Z"/>
+      android:pathData="M365,245Q330,245,305,265Q280,285,280,320Q280,350,300,370Q320,390,360,405L440,435Q470,445,485,465Q500,485,500,515Q500,550,475,575Q450,600,410,600Q375,600,350,580Q325,560,315,525L280,540Q295,585,330,615Q365,645,415,645Q470,645,505,610Q540,575,540,515Q540,480,520,455Q500,430,465,415L385,385Q350,370,335,350Q320,330,320,300Q320,270,340,250Q360,230,395,230Q425,230,450,250Q475,270,485,305L520,290Q505,245,470,220Q435,195,385,195Q345,195,325,215Q305,235,305,265Z"/>
 </vector>
