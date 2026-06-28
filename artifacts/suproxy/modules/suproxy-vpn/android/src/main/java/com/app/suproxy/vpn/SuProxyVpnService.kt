@@ -25,6 +25,9 @@ class SuProxyVpnService : VpnService() {
 
     @Volatile
     var status: String = "disconnected"
+    
+    @Volatile
+    var connectedAtMs: Long = 0  // Connection start timestamp for timer sync
   }
 
   private var engine: SuProxyVpnEngine? = null
@@ -87,12 +90,13 @@ class SuProxyVpnService : VpnService() {
 
             // Tunnel started successfully
             status = "connected"
+            connectedAtMs = System.currentTimeMillis()  // Save connection start time for timer
             mainHandler.post {
               VpnStatusEmitter.emit("connected")
               val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
               manager.notify(NOTIFICATION_ID, buildNotification("Connected"))
             }
-            Log.i("SuProxyVpn", "VPN connected, waiting for tunnel to end")
+            Log.i("SuProxyVpn", "VPN connected at $connectedAtMs, waiting for tunnel to end")
 
             // Blocks until TProxyStopService() is called (ACTION_STOP or onDestroy)
             engine?.waitTunnel()
@@ -100,6 +104,7 @@ class SuProxyVpnService : VpnService() {
 
             // Clean shutdown
             status = "disconnected"
+            connectedAtMs = 0  // Reset connection time
             mainHandler.post { VpnStatusEmitter.emit("disconnected") }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -121,6 +126,7 @@ class SuProxyVpnService : VpnService() {
 
   override fun onDestroy() {
     status = "disconnected"
+    connectedAtMs = 0  // Reset connection time
     instance = null
     stopTunnelAsync()
     mainHandler.post { VpnStatusEmitter.emit("disconnected") }
@@ -129,6 +135,7 @@ class SuProxyVpnService : VpnService() {
 
   override fun onRevoke() {
     status = "disconnected"
+    connectedAtMs = 0  // Reset connection time
     stopTunnelAsync()
     mainHandler.post { VpnStatusEmitter.emit("disconnected") }
     super.onRevoke()

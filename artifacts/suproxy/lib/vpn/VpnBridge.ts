@@ -6,6 +6,7 @@ export interface NativeVpnModule {
   start(configJson: string): Promise<void>;
   stop(): Promise<void>;
   getStatus(): Promise<VpnStatus>;
+  getConnectedAtMs?(): Promise<number>;  // Get connection timestamp (ms) for timer sync
   prepare?: () => Promise<boolean>;
   setActiveKey?: (hasKey: boolean) => Promise<void>;
 }
@@ -40,6 +41,7 @@ function getNativeModule(): NativeVpnModule | null {
 }
 
 let mockStatus: VpnStatus = "disconnected";
+let mockConnectedAt = 0;
 let mockTimer: ReturnType<typeof setTimeout> | null = null;
 
 const mockModule: NativeVpnModule = {
@@ -49,6 +51,9 @@ const mockModule: NativeVpnModule = {
   async getStatus() {
     return mockStatus;
   },
+  async getConnectedAtMs() {
+    return mockConnectedAt;
+  },
   async start(_configJson: string) {
     if (mockTimer) {
       clearTimeout(mockTimer);
@@ -57,6 +62,7 @@ const mockModule: NativeVpnModule = {
     await new Promise<void>((resolve) => {
       mockTimer = setTimeout(() => {
         mockStatus = "connected";
+        mockConnectedAt = Date.now();
         mockTimer = null;
         resolve();
       }, 800);
@@ -71,6 +77,7 @@ const mockModule: NativeVpnModule = {
     await new Promise<void>((resolve) => {
       setTimeout(() => {
         mockStatus = "disconnected";
+        mockConnectedAt = 0;
         resolve();
       }, 300);
     });

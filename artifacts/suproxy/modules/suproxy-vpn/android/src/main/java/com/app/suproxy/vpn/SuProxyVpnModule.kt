@@ -56,6 +56,14 @@ class SuProxyVpnModule : Module() {
     AsyncFunction("getStatus") {
       SuProxyVpnService.status
     }
+    
+    AsyncFunction("getConnectedAtMs") {
+      if (SuProxyVpnService.status == "connected") {
+        SuProxyVpnService.connectedAtMs
+      } else {
+        0L
+      }
+    }
 
     AsyncFunction("start") { configJson: String ->
       val context = appContext.reactContext ?: throw Exception("React context unavailable")

@@ -133,12 +133,44 @@ class VpnServiceImpl {
         );
         // Update to native status if it differs
         if (nativeStatus === "connected") {
-          this.setStatus("connected", null, this.state.connectedAt ?? Date.now());
+          // Get connection start time from native if available
+          let connectedAt = this.state.connectedAt ?? Date.now();
+          try {
+            const module = resolveVpnModule();
+            if (module.getConnectedAtMs) {
+              const nativeConnectedAt = await module.getConnectedAtMs();
+              if (nativeConnectedAt > 0) {
+                connectedAt = nativeConnectedAt;
+                console.log(`[VpnService] Restored connectedAt from native: ${connectedAt}`);
+              }
+            }
+          } catch (error) {
+            // Ignore if getConnectedAtMs not available
+          }
+          this.setStatus("connected", null, connectedAt);
         } else if (nativeStatus === "disconnected") {
           this.setStatus("disconnected", null);
         } else {
           this.setStatus(nativeStatus as VpnStatus);
         }
+      } else if (nativeStatus === "connected" && !this.state.connectedAt) {
+        // If already connected but we don't have a timestamp, get it from native
+        // This handles the case where VPN was started from Quick Settings Tile
+        console.log("[VpnService] Restoring connectedAt timestamp for existing connection");
+        let connectedAt = Date.now();
+        try {
+          const module = resolveVpnModule();
+          if (module.getConnectedAtMs) {
+            const nativeConnectedAt = await module.getConnectedAtMs();
+            if (nativeConnectedAt > 0) {
+              connectedAt = nativeConnectedAt;
+              console.log(`[VpnService] Restored connectedAt from native: ${connectedAt}`);
+            }
+          }
+        } catch (error) {
+          // Ignore if getConnectedAtMs not available
+        }
+        this.setStatus("connected", null, connectedAt);
       }
     } catch (error) {
       // Silently ignore errors during status sync

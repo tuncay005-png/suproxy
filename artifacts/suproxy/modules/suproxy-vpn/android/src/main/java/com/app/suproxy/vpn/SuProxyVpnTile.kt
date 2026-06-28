@@ -21,6 +21,7 @@ import android.util.Log
  * - Shows real-time VPN status (Inactive/Connecting/Active)
  * - Synchronized with in-app VPN button
  * - Handles VPN permission requests
+ * - Background-safe: works even when panel is closed immediately
  * - Compatible with Android 7.0+ (API 24+)
  */
 class SuProxyVpnTile : TileService() {
@@ -47,6 +48,8 @@ class SuProxyVpnTile : TileService() {
 
   private val mainHandler = Handler(Looper.getMainLooper())
   private var statusUpdateRunnable: Runnable? = null
+  @Volatile
+  private var isBusy = false  // Prevent concurrent operations
 
   override fun onStartListening() {
     super.onStartListening()
@@ -65,55 +68,83 @@ class SuProxyVpnTile : TileService() {
     super.onClick()
     Log.i(TAG, "Tile clicked")
     
+    // Prevent concurrent operations
+    if (isBusy) {
+      Log.w(TAG, "Tile is busy, ignoring click")
+      return
+    }
+    
+    isBusy = true
     val currentStatus = SuProxyVpnService.status
     Log.i(TAG, "Current VPN status: $currentStatus")
     
-    when (currentStatus) {
-      "disconnected" -> {
-        // Check if VPN permission is granted
-        val prepareIntent = VpnService.prepare(applicationContext)
-        if (prepareIntent != null) {
-          // Permission not granted - show dialog
-          Log.i(TAG, "VPN permission not granted, showing dialog")
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Android 14+ (API 34+): Start activity for permission
-            startActivityAndCollapse(prepareIntent)
-          } else {
-            // Android 13 and below: Start activity
-            prepareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivityAndCollapse(prepareIntent)
+    // Process in background thread - continues even if panel is closed
+    Thread {
+      try {
+        when (currentStatus) {
+          "disconnected" -> {
+            // Check if VPN permission is granted
+            val prepareIntent = VpnService.prepare(applicationContext)
+            if (prepareIntent != null) {
+              // Permission not granted - show dialog on main thread
+              Log.i(TAG, "VPN permission not granted, showing dialog")
+              mainHandler.post {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                  startActivityAndCollapse(prepareIntent)
+                } else {
+                  prepareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                  startActivityAndCollapse(prepareIntent)
+                }
+                isBusy = false
+              }
+              return@Thread
+            }
+            
+            // Check if user has configured a VPN key
+            val configJson = VpnConfigStore.getConfig(applicationContext)
+            if (configJson.isNullOrBlank()) {
+              Log.w(TAG, "No VPN config found, user needs to configure key in app")
+              mainHandler.post {
+                showUnavailable("Open app to configure VPN key")
+                isBusy = false
+              }
+              return@Thread
+            }
+            
+            // Start VPN (non-blocking)
+            Log.i(TAG, "Starting VPN from Quick Settings")
+            startVpn(configJson)
           }
-          return
+          
+          "connected", "connecting" -> {
+            // Stop VPN (non-blocking)
+            Log.i(TAG, "Stopping VPN from Quick Settings")
+            stopVpn()
+          }
+          
+          "error" -> {
+            // Error state - try to stop and reset
+            Log.i(TAG, "VPN in error state, stopping")
+            stopVpn()
+          }
         }
         
-        // Check if user has configured a VPN key
-        val configJson = VpnConfigStore.getConfig(applicationContext)
-        if (configJson.isNullOrBlank()) {
-          Log.w(TAG, "No VPN config found, user needs to configure key in app")
-          showUnavailable("Open app to configure VPN key")
-          return
+        // Update tile and reset busy flag on main thread
+        mainHandler.post {
+          updateTileState()
+          // Short delay to prevent rapid re-clicks
+          mainHandler.postDelayed({
+            isBusy = false
+          }, 300)
         }
-        
-        // Start VPN
-        Log.i(TAG, "Starting VPN from Quick Settings")
-        startVpn(configJson)
+      } catch (e: Exception) {
+        Log.e(TAG, "Click handler failed", e)
+        mainHandler.post {
+          showError("Operation failed")
+          isBusy = false
+        }
       }
-      
-      "connected", "connecting" -> {
-        // Stop VPN
-        Log.i(TAG, "Stopping VPN from Quick Settings")
-        stopVpn()
-      }
-      
-      "error" -> {
-        // Error state - try to stop and reset
-        Log.i(TAG, "VPN in error state, stopping")
-        stopVpn()
-      }
-    }
-    
-    // Update tile immediately
-    updateTileState()
+    }.apply { isDaemon = true }.start()
   }
 
   /**
