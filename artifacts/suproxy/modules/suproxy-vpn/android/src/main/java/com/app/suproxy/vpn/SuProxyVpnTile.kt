@@ -49,7 +49,7 @@ class SuProxyVpnTile : TileService() {
   private val mainHandler = Handler(Looper.getMainLooper())
   private var statusUpdateRunnable: Runnable? = null
   @Volatile
-  private var isBusy = false  // Prevent concurrent operations
+  private var isBusy = false  // Prevent concurrent operations - clears when operation completes
 
   override fun onStartListening() {
     super.onStartListening()
@@ -68,9 +68,9 @@ class SuProxyVpnTile : TileService() {
     super.onClick()
     Log.i(TAG, "Tile clicked")
     
-    // Prevent concurrent operations
+    // Prevent concurrent operations - operation-based protection (no time-based debounce)
     if (isBusy) {
-      Log.w(TAG, "Tile is busy, ignoring click")
+      Log.w(TAG, "Operation already in progress, ignoring click")
       return
     }
     
@@ -95,7 +95,7 @@ class SuProxyVpnTile : TileService() {
                   prepareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                   startActivityAndCollapse(prepareIntent)
                 }
-                isBusy = false
+                isBusy = false  // Clear immediately - permission dialog doesn't block
               }
               return@Thread
             }
@@ -106,18 +106,18 @@ class SuProxyVpnTile : TileService() {
               Log.w(TAG, "No VPN config found, user needs to configure key in app")
               mainHandler.post {
                 showUnavailable("Open app to configure VPN key")
-                isBusy = false
+                isBusy = false  // Clear immediately - no operation started
               }
               return@Thread
             }
             
-            // Start VPN (non-blocking)
+            // Start VPN - busy flag will be cleared when operation completes (by native status change)
             Log.i(TAG, "Starting VPN from Quick Settings")
             startVpn(configJson)
           }
           
           "connected", "connecting" -> {
-            // Stop VPN (non-blocking)
+            // Stop VPN - busy flag will be cleared when operation completes
             Log.i(TAG, "Stopping VPN from Quick Settings")
             stopVpn()
           }
@@ -129,14 +129,19 @@ class SuProxyVpnTile : TileService() {
           }
         }
         
-        // Update tile and reset busy flag on main thread
+        // Update tile on main thread
         mainHandler.post {
           updateTileState()
-          // Short delay to prevent rapid re-clicks
-          mainHandler.postDelayed({
-            isBusy = false
-          }, 300)
         }
+        
+        // Busy flag will be cleared by native status change callback
+        // If operation fails, clear after 2 seconds as fallback
+        mainHandler.postDelayed({
+          if (isBusy) {
+            Log.w(TAG, "Operation timeout, clearing busy flag")
+            isBusy = false
+          }
+        }, 2000)
       } catch (e: Exception) {
         Log.e(TAG, "Click handler failed", e)
         mainHandler.post {
@@ -188,6 +193,14 @@ class SuProxyVpnTile : TileService() {
     val status = SuProxyVpnService.status
     
     Log.d(TAG, "Updating tile state: status=$status")
+    
+    // Clear busy flag when operation completes
+    if (status == "connected" || status == "disconnected" || status == "error") {
+      if (isBusy) {
+        Log.d(TAG, "Operation completed, clearing busy flag")
+        isBusy = false
+      }
+    }
     
     when (status) {
       "disconnected" -> {
