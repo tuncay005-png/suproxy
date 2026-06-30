@@ -1,10 +1,16 @@
 import { parseVlessUrl } from "@/lib/vpn/parseVlessUrl";
 import { VpnError, type ParsedVlessProfile } from "@/lib/vpn/types";
+import {
+  detectCountryCode,
+  getServerMetadata,
+  type ServerMetadata,
+} from "@/lib/vpn/ServerMetadata";
 
 export interface SubscriptionNode {
   url: string;
   remark: string;
   profile: ParsedVlessProfile;
+  metadata: ServerMetadata;
 }
 
 const SUBSCRIPTION_URL_PATTERN = /^https?:\/\//i;
@@ -64,10 +70,15 @@ export function parseSubscriptionContent(raw: string): SubscriptionNode[] {
   for (const url of lines) {
     try {
       const profile = parseVlessUrl(url);
+      const remark = profile.remark ?? profile.address;
+      const countryCode = detectCountryCode(profile.address, remark);
+      const metadata = getServerMetadata(countryCode);
+      
       nodes.push({
         url,
-        remark: profile.remark ?? profile.address,
+        remark,
         profile,
+        metadata,
       });
     } catch {
       // Skip unsupported or malformed lines (vmess, trojan, etc.)
@@ -124,11 +135,16 @@ export async function resolveSubscriptionInput(
 
   if (VLESS_LINE_PATTERN.test(trimmed)) {
     const profile = parseVlessUrl(trimmed);
+    const remark = profile.remark ?? profile.address;
+    const countryCode = detectCountryCode(profile.address, remark);
+    const metadata = getServerMetadata(countryCode);
+    
     return [
       {
         url: trimmed,
-        remark: profile.remark ?? profile.address,
+        remark,
         profile,
+        metadata,
       },
     ];
   }

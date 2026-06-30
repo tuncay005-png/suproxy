@@ -58,7 +58,7 @@ function getPingColor(ms: number): string {
 }
 
 const SERVERS_FALLBACK = [
-  { flag: "🌐", name: "Сервер", ms: 0 },
+  { flag: "🇫🇮", name: "Финляндия", ms: 0 },
 ];
 
 export default function HomeScreen() {
@@ -110,8 +110,8 @@ export default function HomeScreen() {
   const servers: { flag: string; name: string; ms: number }[] =
     keyData && keyData.nodes.length > 0
       ? keyData.nodes.map((node) => ({
-          flag: "🌐",
-          name: node.remark,
+          flag: node.metadata.flag,
+          name: node.metadata.countryNameRu,
           ms: 0,
         }))
       : SERVERS_FALLBACK;
