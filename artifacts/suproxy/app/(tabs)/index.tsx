@@ -18,6 +18,8 @@ import { useState, useRef, useEffect } from "react";
 import { ScreenContainer } from "@/components/ScreenContainer";
 import { useColors } from "@/hooks/useColors";
 import { useVpnConnection } from "@/hooks/useVpnConnection";
+import { usePingMonitor, getServerLatency } from "@/hooks/usePingMonitor";
+import { pingService } from "@/lib/vpn/PingService";
 import { ru } from "@/lib/i18n";
 import { scheduleExpiryNotification, cancelExpiryNotification } from "@/lib/notifications";
 import {
@@ -51,16 +53,6 @@ function calcRemainingDays(tariff: TariffData): number {
   return Math.max(0, TARIFF_DAYS[tariff.type] - diffDays);
 }
 
-function getPingColor(ms: number): string {
-  if (ms <= 50) return "#22C55E";
-  if (ms <= 100) return "#EAB308";
-  return "#EF4444";
-}
-
-const SERVERS_FALLBACK = [
-  { flag: "🇫🇮", name: "Финляндия", ms: 0 },
-];
-
 export default function HomeScreen() {
   const colors = useColors();
   const [remainingDays, setRemainingDays] = useState(0);
@@ -73,6 +65,9 @@ export default function HomeScreen() {
   const activeVlessUrl = keyData ? getActiveVlessUrl(keyData) : null;
   const vpn = useVpnConnection(activeVlessUrl);
   const { isConnected, isLoading, connectionTime, toggle, reconnect, disconnect, error: vpnError } = vpn;
+  
+  // Ping monitoring for all servers
+  const pingMonitor = usePingMonitor(keyData?.nodes ?? []);
 
   // Debounce flag to prevent rapid successive toggle calls
   const [toggleLocked, setToggleLocked] = useState(false);
@@ -107,14 +102,15 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  const servers: { flag: string; name: string; ms: number }[] =
+  const servers: { flag: string; name: string; address: string; latency: number | null }[] =
     keyData && keyData.nodes.length > 0
       ? keyData.nodes.map((node) => ({
           flag: node.metadata.flag,
           name: node.metadata.countryNameRu,
-          ms: 0,
+          address: node.profile.address,
+          latency: getServerLatency(pingMonitor.results, node.profile.address),
         }))
-      : SERVERS_FALLBACK;
+      : [{ flag: "🇫🇮", name: "Финляндия", address: "", latency: null }];
 
   useEffect(() => {
     Animated.timing(fillAnim, {
@@ -472,29 +468,32 @@ export default function HomeScreen() {
 
               {serversOpen && (
                 <View style={styles.serverList}>
-                  {servers.map((server, index) => (
-                    <TouchableOpacity
-                      key={`${server.name}-${index}`}
-                      onPress={() => void handleSelectServer(index)}
-                      style={[
-                        styles.serverItem,
-                        selectedServer === index ? styles.serverItemSelected : styles.serverItemDefault,
-                      ]}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.serverFlag}>{server.flag}</Text>
-                      <View style={styles.serverInfo}>
-                        <Text style={[styles.serverName, { color: "#24A1DE" }]}>
-                          {server.name}
+                  {servers.map((server, index) => {
+                    const latencyText = pingService.formatLatency(server.latency);
+                    const latencyColor = pingService.getPingColor(server.latency);
+                    
+                    return (
+                      <TouchableOpacity
+                        key={`${server.name}-${index}`}
+                        onPress={() => void handleSelectServer(index)}
+                        style={[
+                          styles.serverItem,
+                          selectedServer === index ? styles.serverItemSelected : styles.serverItemDefault,
+                        ]}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.serverFlag}>{server.flag}</Text>
+                        <View style={styles.serverInfo}>
+                          <Text style={[styles.serverName, { color: "#24A1DE" }]}>
+                            {server.name}
+                          </Text>
+                        </View>
+                        <Text style={[styles.serverLatency, { color: latencyColor }]}>
+                          {latencyText}
                         </Text>
-                      </View>
-                      {server.ms > 0 ? (
-                        <Text style={[styles.serverMs, { color: getPingColor(server.ms) }]}>
-                          {server.ms}ms
-                        </Text>
-                      ) : null}
-                    </TouchableOpacity>
-                  ))}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -566,7 +565,7 @@ const styles = StyleSheet.create({
   serverFlag: { fontSize: 19 },
   serverInfo: { flex: 1 },
   serverName: { fontWeight: "800", fontSize: 15 },
-  serverMs: { fontSize: 11, fontWeight: "800" },
+  serverLatency: { fontSize: 13, fontWeight: "800", minWidth: 45, textAlign: "right" },
   modalOverlay: {
     flex: 1, backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center", alignItems: "center",
